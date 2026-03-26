@@ -14,13 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FitTrack",
-  description: "Your personal fitness companion — workouts, programs, and progress",
+  title: "RepFlow",
+  description: "Get in the flow — workouts, programs, and progress",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "FitTrack",
+    title: "RepFlow",
   },
 };
 

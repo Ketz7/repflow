@@ -1,7 +1,7 @@
 {
-  "name": "FitTrack",
-  "short_name": "FitTrack",
-  "description": "Your personal fitness tracker — workouts, programs, and progress",
+  "name": "RepFlow",
+  "short_name": "RepFlow",
+  "description": "Get in the flow — workouts, programs, and progress",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B1120",

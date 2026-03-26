@@ -23,10 +23,10 @@ export default function LoginPage() {
           </svg>
         </div>
         <h1 className="text-3xl font-bold text-foreground tracking-tight">
-          FitTrack
+          RepFlow
         </h1>
         <p className="mt-2 text-subtext text-sm">
-          Your personal fitness companion
+          Get in the flow
         </p>
       </div>
 
