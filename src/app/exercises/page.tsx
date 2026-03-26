@@ -1,10 +1,177 @@
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { Exercise, MuscleGroup } from "@/types";
+import Input from "@/components/ui/Input";
+import Badge from "@/components/ui/Badge";
+import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+import ExerciseSubmitForm from "@/components/exercises/ExerciseSubmitForm";
+import YouTubeEmbed from "@/components/exercises/YouTubeEmbed";
+import { motion, AnimatePresence } from "framer-motion";
+
 export default function ExercisesPage() {
-  return (
-    <div className="px-4 pt-6">
-      <h1 className="text-2xl font-bold text-foreground mb-6">Exercise Library</h1>
-      <div className="rounded-2xl bg-card border border-border p-5 text-center">
-        <p className="text-subtext text-sm">Exercise library coming soon.</p>
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [muscleGroups, setMuscleGroups] = useState<MuscleGroup[]>([]);
+  const [search, setSearch] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const [{ data: groups }, { data: exs }] = await Promise.all([
+        supabase.from("muscle_groups").select("*").order("sort_order"),
+        supabase.from("exercises").select("*, muscle_group:muscle_groups(*)").eq("is_approved", true).order("name"),
+      ]);
+      setMuscleGroups(groups || []);
+      setExercises(exs || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const filtered = useMemo(() => {
+    return exercises.filter((e) => {
+      const matchesSearch = !search || e.name.toLowerCase().includes(search.toLowerCase());
+      const matchesGroup = !selectedGroup || e.muscle_group_id === selectedGroup;
+      return matchesSearch && matchesGroup;
+    });
+  }, [exercises, search, selectedGroup]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Exercise[]>();
+    for (const ex of filtered) {
+      const groupName = ex.muscle_group?.name || "Other";
+      if (!map.has(groupName)) map.set(groupName, []);
+      map.get(groupName)!.push(ex);
+    }
+    return map;
+  }, [filtered]);
+
+  if (loading) {
+    return (
+      <div className="px-4 pt-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 w-48 bg-card rounded-lg" />
+          <div className="h-10 bg-card rounded-xl" />
+          <div className="h-32 bg-card rounded-2xl" />
+          <div className="h-32 bg-card rounded-2xl" />
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="px-4 pt-6 pb-4">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-foreground">Exercises</h1>
+        <Button size="sm" onClick={() => setShowSubmitForm(true)}>
+          + Submit
+        </Button>
+      </div>
+
+      {/* Search */}
+      <Input
+        placeholder="Search exercises..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="mb-3"
+      />
+
+      {/* Muscle Group Filters */}
+      <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
+        <button
+          onClick={() => setSelectedGroup(null)}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            !selectedGroup ? "bg-primary text-background" : "bg-card text-subtext border border-border"
+          }`}
+        >
+          All
+        </button>
+        {muscleGroups.map((g) => (
+          <button
+            key={g.id}
+            onClick={() => setSelectedGroup(selectedGroup === g.id ? null : g.id)}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              selectedGroup === g.id ? "bg-primary text-background" : "bg-card text-subtext border border-border"
+            }`}
+          >
+            {g.icon} {g.name}
+          </button>
+        ))}
+      </div>
+
+      {/* Exercise List */}
+      <div className="space-y-6">
+        {Array.from(grouped.entries()).map(([groupName, exs]) => (
+          <div key={groupName}>
+            <h3 className="text-sm font-semibold text-subtext uppercase tracking-wider mb-2">
+              {groupName} ({exs.length})
+            </h3>
+            <div className="space-y-2">
+              <AnimatePresence>
+                {exs.map((ex) => (
+                  <motion.button
+                    key={ex.id}
+                    layout
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    onClick={() => setSelectedExercise(ex)}
+                    className="w-full text-left p-3 rounded-xl bg-card border border-border hover:border-primary/30 transition-colors"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-foreground">{ex.name}</span>
+                      {ex.youtube_url && (
+                        <Badge variant="primary">Video</Badge>
+                      )}
+                    </div>
+                    {ex.description && (
+                      <p className="text-xs text-subtext mt-1 line-clamp-1">{ex.description}</p>
+                    )}
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        ))}
+        {grouped.size === 0 && (
+          <p className="text-center text-subtext text-sm py-8">No exercises found.</p>
+        )}
+      </div>
+
+      {/* Exercise Detail Modal */}
+      <Modal
+        isOpen={!!selectedExercise}
+        onClose={() => setSelectedExercise(null)}
+        title={selectedExercise?.name}
+      >
+        {selectedExercise && (
+          <div className="space-y-4">
+            {selectedExercise.youtube_url && (
+              <YouTubeEmbed url={selectedExercise.youtube_url} />
+            )}
+            <Badge>{selectedExercise.muscle_group?.name}</Badge>
+            <p className="text-sm text-subtext">{selectedExercise.description}</p>
+          </div>
+        )}
+      </Modal>
+
+      {/* Submit Exercise Modal */}
+      <Modal
+        isOpen={showSubmitForm}
+        onClose={() => setShowSubmitForm(false)}
+        title="Submit an Exercise"
+      >
+        <ExerciseSubmitForm
+          muscleGroups={muscleGroups}
+          onSubmitted={() => setShowSubmitForm(false)}
+        />
+      </Modal>
     </div>
   );
 }
