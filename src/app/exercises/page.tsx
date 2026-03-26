@@ -19,16 +19,24 @@ export default function ExercisesPage() {
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [editingVideoUrl, setEditingVideoUrl] = useState("");
+  const [savingVideo, setSavingVideo] = useState(false);
 
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const [{ data: groups }, { data: exs }] = await Promise.all([
+      const [{ data: groups }, { data: exs }, { data: { user } }] = await Promise.all([
         supabase.from("muscle_groups").select("*").order("sort_order"),
         supabase.from("exercises").select("*, muscle_group:muscle_groups(*)").eq("is_approved", true).order("name"),
+        supabase.auth.getUser(),
       ]);
       setMuscleGroups(groups || []);
       setExercises(exs || []);
+      if (user) {
+        const { data: profile } = await supabase.from("users").select("is_admin").eq("id", user.id).single();
+        setIsAdmin(profile?.is_admin || false);
+      }
       setLoading(false);
     }
     load();
@@ -147,16 +155,81 @@ export default function ExercisesPage() {
       {/* Exercise Detail Modal */}
       <Modal
         isOpen={!!selectedExercise}
-        onClose={() => setSelectedExercise(null)}
+        onClose={() => { setSelectedExercise(null); setEditingVideoUrl(""); }}
         title={selectedExercise?.name}
       >
         {selectedExercise && (
           <div className="space-y-4">
-            {selectedExercise.youtube_url && (
+            {selectedExercise.youtube_url ? (
               <YouTubeEmbed url={selectedExercise.youtube_url} />
+            ) : (
+              <div className="rounded-xl bg-surface border border-border p-6 text-center">
+                <p className="text-subtext text-sm">No video clip added yet.</p>
+              </div>
             )}
             <Badge>{selectedExercise.muscle_group?.name}</Badge>
             <p className="text-sm text-subtext">{selectedExercise.description}</p>
+
+            {/* YouTube URL editor (admin only) */}
+            {isAdmin && (
+              <div className="pt-2 border-t border-border">
+                <label className="text-xs text-subtext mb-1 block">
+                  YouTube URL (max 30s clip)
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://youtube.com/..."
+                    value={editingVideoUrl || selectedExercise.youtube_url || ""}
+                    onChange={(e) => setEditingVideoUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    disabled={savingVideo}
+                    onClick={async () => {
+                      setSavingVideo(true);
+                      const supabase = createClient();
+                      const url = editingVideoUrl.trim() || null;
+                      await supabase
+                        .from("exercises")
+                        .update({ youtube_url: url })
+                        .eq("id", selectedExercise.id);
+                      // Update local state
+                      setExercises((prev) =>
+                        prev.map((e) =>
+                          e.id === selectedExercise.id ? { ...e, youtube_url: url } : e
+                        )
+                      );
+                      setSelectedExercise({ ...selectedExercise, youtube_url: url });
+                      setSavingVideo(false);
+                    }}
+                  >
+                    {savingVideo ? "..." : "Save"}
+                  </Button>
+                </div>
+                {selectedExercise.youtube_url && (
+                  <button
+                    className="text-xs text-error mt-1"
+                    onClick={async () => {
+                      const supabase = createClient();
+                      await supabase
+                        .from("exercises")
+                        .update({ youtube_url: null })
+                        .eq("id", selectedExercise.id);
+                      setExercises((prev) =>
+                        prev.map((e) =>
+                          e.id === selectedExercise.id ? { ...e, youtube_url: null } : e
+                        )
+                      );
+                      setSelectedExercise({ ...selectedExercise, youtube_url: null });
+                      setEditingVideoUrl("");
+                    }}
+                  >
+                    Remove video
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </Modal>
