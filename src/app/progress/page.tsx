@@ -41,7 +41,7 @@ export default function ProgressPage() {
           .not("ended_at", "is", null)
           .order("ended_at", { ascending: false })
           .limit(50),
-        supabase.rpc("get_personal_records", { p_user_id: user.id }).catch(() => ({ data: null })),
+        Promise.resolve(supabase.rpc("get_personal_records", { p_user_id: user.id })).catch(() => ({ data: null as PersonalRecord[] | null })),
       ]);
 
       setWeightLogs(weights || []);

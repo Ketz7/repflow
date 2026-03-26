@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function StartSessionPage() {
+function StartSessionInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
     async function startSession() {
       const workoutId = searchParams.get("workout");
-      const scheduleDate = searchParams.get("date");
       if (!workoutId) {
         router.push("/calendar");
         return;
@@ -56,5 +55,19 @@ export default function StartSessionPage() {
         <p className="text-subtext text-sm">Starting workout...</p>
       </div>
     </div>
+  );
+}
+
+export default function StartSessionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <StartSessionInner />
+    </Suspense>
   );
 }
