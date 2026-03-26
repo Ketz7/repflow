@@ -22,6 +22,16 @@ export default function CalendarPage() {
   const [phaseName, setPhaseName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [creating, setCreating] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [trainingDays, setTrainingDays] = useState<number[]>([1, 3, 5]); // Default: Mon, Wed, Fri
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  const toggleTrainingDay = (day: number) => {
+    setTrainingDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()
+    );
+  };
 
   const loadData = async () => {
     const supabase = createClient();
@@ -107,29 +117,25 @@ export default function CalendarPage() {
 
     const sortedWorkouts = [...program.program_workouts].sort((a, b) => a.day_order - b.day_order);
 
-    // Auto-populate schedule: rotate workouts across 8 weeks, rest days between
+    // Auto-populate schedule using user-selected training days
     const scheduleEntries: { phase_id: string; program_workout_id: string; scheduled_date: string; sort_order: number }[] = [];
     let workoutIndex = 0;
     const current = new Date(startDate);
+    const totalDays = PHASE_DURATION_WEEKS * 7;
 
-    for (let week = 0; week < PHASE_DURATION_WEEKS; week++) {
-      // 3-6 workout days per week depending on program size
-      const daysPerWeek = Math.min(sortedWorkouts.length, 6);
-      for (let day = 0; day < 7 && workoutIndex < PHASE_DURATION_WEEKS * daysPerWeek * 2; day++) {
-        const dayOfWeek = current.getDay();
-        // Skip Sundays as rest days
-        if (dayOfWeek !== 0 && day < daysPerWeek) {
-          const wo = sortedWorkouts[workoutIndex % sortedWorkouts.length];
-          scheduleEntries.push({
-            phase_id: newPhase.id,
-            program_workout_id: wo.id,
-            scheduled_date: current.toISOString().split("T")[0],
-            sort_order: scheduleEntries.length,
-          });
-          workoutIndex++;
-        }
-        current.setDate(current.getDate() + 1);
+    for (let day = 0; day < totalDays; day++) {
+      const dayOfWeek = current.getDay();
+      if (trainingDays.includes(dayOfWeek)) {
+        const wo = sortedWorkouts[workoutIndex % sortedWorkouts.length];
+        scheduleEntries.push({
+          phase_id: newPhase.id,
+          program_workout_id: wo.id,
+          scheduled_date: current.toISOString().split("T")[0],
+          sort_order: scheduleEntries.length,
+        });
+        workoutIndex++;
       }
+      current.setDate(current.getDate() + 1);
     }
 
     if (scheduleEntries.length > 0) {
@@ -186,7 +192,27 @@ export default function CalendarPage() {
               <label className="text-xs text-subtext mb-1 block">Start Date *</label>
               <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
-            <Button size="lg" className="w-full" disabled={creating || !selectedProgramId || !startDate || !phaseName.trim()} onClick={handleCreatePhase}>
+            <div>
+              <label className="text-xs text-subtext mb-1 block">Training Days *</label>
+              <div className="flex gap-1.5">
+                {dayNames.map((name, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => toggleTrainingDay(i)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${
+                      trainingDays.includes(i)
+                        ? "bg-primary text-background"
+                        : "bg-surface border border-border text-subtext"
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-subtext/60 mt-1">{trainingDays.length} days/week selected</p>
+            </div>
+            <Button size="lg" className="w-full" disabled={creating || !selectedProgramId || !startDate || !phaseName.trim() || trainingDays.length === 0} onClick={handleCreatePhase}>
               {creating ? "Creating..." : "Create Phase"}
             </Button>
           </div>
@@ -205,7 +231,17 @@ export default function CalendarPage() {
           {isDeloadWeek ? "Deload Week" : `Week ${currentWeek} of ${PHASE_DURATION_WEEKS}`}
         </Badge>
       </div>
-      <p className="text-sm text-subtext mb-5">{phase.name}</p>
+      <div className="flex items-center justify-between mb-5">
+        <p className="text-sm text-subtext">{phase.name}</p>
+        <div className="flex gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setShowCreatePhase(true)}>
+            New Phase
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+            End Phase
+          </Button>
+        </div>
+      </div>
 
       {isDeloadWeek && (
         <motion.div
@@ -296,6 +332,33 @@ export default function CalendarPage() {
           </div>
           <Button size="lg" className="w-full" disabled={creating || !selectedProgramId || !startDate || !phaseName.trim()} onClick={handleCreatePhase}>
             {creating ? "Creating..." : "Create Phase"}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Delete Phase Confirmation */}
+      <Modal isOpen={showDeleteConfirm} onClose={() => setShowDeleteConfirm(false)} title="End Current Phase?">
+        <p className="text-sm text-subtext mb-4">
+          This will remove your current phase and its entire schedule. Your completed workout sessions will be kept in your history.
+        </p>
+        <div className="flex gap-3">
+          <Button variant="secondary" className="flex-1" onClick={() => setShowDeleteConfirm(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            className="flex-1"
+            onClick={async () => {
+              if (!phase) return;
+              const supabase = createClient();
+              await supabase.from("phase_schedule").delete().eq("phase_id", phase.id);
+              await supabase.from("phases").delete().eq("id", phase.id);
+              setPhase(null);
+              setSchedule([]);
+              setShowDeleteConfirm(false);
+            }}
+          >
+            End Phase
           </Button>
         </div>
       </Modal>
