@@ -46,102 +46,102 @@ begin
   select id into full_body_id from public.muscle_groups where name = 'Full Body';
 
   -- CHEST (8 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Barbell Bench Press', chest_id, 'Flat bench press with barbell. Primary chest builder.', true),
-    ('Incline Dumbbell Press', chest_id, 'Incline bench press with dumbbells targeting upper chest.', true),
-    ('Decline Bench Press', chest_id, 'Decline angle bench press targeting lower chest.', true),
-    ('Dumbbell Flyes', chest_id, 'Flat bench flyes for chest stretch and contraction.', true),
-    ('Cable Crossover', chest_id, 'Standing cable flyes for constant tension on chest.', true),
-    ('Push-Ups', chest_id, 'Bodyweight push-ups. Versatile chest and tricep exercise.', true),
-    ('Chest Dips', chest_id, 'Leaning forward dips emphasizing chest.', true),
-    ('Machine Chest Press', chest_id, 'Guided chest press machine for isolation.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Barbell Bench Press', chest_id, 'Flat bench press with barbell. Primary chest builder.', true, 'https://www.youtube.com/shorts/hWbUlkb5Ms4'),
+    ('Incline Dumbbell Press', chest_id, 'Incline bench press with dumbbells targeting upper chest.', true, 'https://www.youtube.com/shorts/8fXfwG4ftaQ'),
+    ('Decline Bench Press', chest_id, 'Decline angle bench press targeting lower chest.', true, 'https://www.youtube.com/shorts/a-UFQE4oxWY'),
+    ('Dumbbell Flyes', chest_id, 'Flat bench flyes for chest stretch and contraction.', true, 'https://www.youtube.com/shorts/rk8YayRoTRQ'),
+    ('Cable Crossover', chest_id, 'Standing cable flyes for constant tension on chest.', true, 'https://www.youtube.com/shorts/M97ra0UR-40'),
+    ('Push-Ups', chest_id, 'Bodyweight push-ups. Versatile chest and tricep exercise.', true, 'https://www.youtube.com/shorts/qU_QESJ7zPs'),
+    ('Chest Dips', chest_id, 'Leaning forward dips emphasizing chest.', true, 'https://www.youtube.com/shorts/NuhXmq6x9Sk'),
+    ('Machine Chest Press', chest_id, 'Guided chest press machine for isolation.', true, 'https://www.youtube.com/shorts/Qu7-ceCvq7w');
 
   -- BACK (9 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Deadlift', back_id, 'Conventional deadlift. Compound movement for entire posterior chain.', true),
-    ('Barbell Row', back_id, 'Bent-over barbell row targeting mid-back.', true),
-    ('Pull-Ups', back_id, 'Bodyweight pull-ups for lats and upper back.', true),
-    ('Lat Pulldown', back_id, 'Cable lat pulldown for lat width.', true),
-    ('Seated Cable Row', back_id, 'Seated row with cable for mid-back thickness.', true),
-    ('Dumbbell Row', back_id, 'Single-arm dumbbell row for unilateral back work.', true),
-    ('T-Bar Row', back_id, 'T-bar row for mid-back thickness.', true),
-    ('Face Pulls', back_id, 'Cable face pulls for rear delts and upper back health.', true),
-    ('Hyperextensions', back_id, 'Back extension for lower back strength.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Deadlift', back_id, 'Conventional deadlift. Compound movement for entire posterior chain.', true, 'https://www.youtube.com/shorts/ZaTM37cfiDs'),
+    ('Barbell Row', back_id, 'Bent-over barbell row targeting mid-back.', true, 'https://www.youtube.com/shorts/phVtqawIgbk'),
+    ('Pull-Ups', back_id, 'Bodyweight pull-ups for lats and upper back.', true, 'https://www.youtube.com/shorts/ym1V5H35IpA'),
+    ('Lat Pulldown', back_id, 'Cable lat pulldown for lat width.', true, 'https://www.youtube.com/shorts/bNmvKpJSWKM'),
+    ('Seated Cable Row', back_id, 'Seated row with cable for mid-back thickness.', true, 'https://www.youtube.com/shorts/qD1WZ5pSuvk'),
+    ('Dumbbell Row', back_id, 'Single-arm dumbbell row for unilateral back work.', true, 'https://www.youtube.com/shorts/vu_YDt9nGv4'),
+    ('T-Bar Row', back_id, 'T-bar row for mid-back thickness.', true, 'https://www.youtube.com/shorts/8pR3JoZ0iBU'),
+    ('Face Pulls', back_id, 'Cable face pulls for rear delts and upper back health.', true, 'https://www.youtube.com/shorts/IeOqdw9WI90'),
+    ('Hyperextensions', back_id, 'Back extension for lower back strength.', true, 'https://www.youtube.com/shorts/S1_eZIIZlIc');
 
   -- SHOULDERS (7 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Overhead Press', shoulders_id, 'Standing barbell overhead press. Primary shoulder builder.', true),
-    ('Dumbbell Shoulder Press', shoulders_id, 'Seated or standing dumbbell shoulder press.', true),
-    ('Lateral Raises', shoulders_id, 'Dumbbell lateral raises for side delts.', true),
-    ('Front Raises', shoulders_id, 'Dumbbell front raises for anterior delts.', true),
-    ('Reverse Flyes', shoulders_id, 'Bent-over reverse flyes for rear delts.', true),
-    ('Arnold Press', shoulders_id, 'Rotational dumbbell press hitting all delt heads.', true),
-    ('Upright Row', shoulders_id, 'Barbell or dumbbell upright row for traps and side delts.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Overhead Press', shoulders_id, 'Standing barbell overhead press. Primary shoulder builder.', true, 'https://www.youtube.com/shorts/s-T3E6654A8'),
+    ('Dumbbell Shoulder Press', shoulders_id, 'Seated or standing dumbbell shoulder press.', true, 'https://www.youtube.com/shorts/OLePvpxQEGk'),
+    ('Lateral Raises', shoulders_id, 'Dumbbell lateral raises for side delts.', true, 'https://www.youtube.com/shorts/Kl3LEzQ5Zqs'),
+    ('Front Raises', shoulders_id, 'Dumbbell front raises for anterior delts.', true, 'https://www.youtube.com/shorts/yHx8wPv4RPo'),
+    ('Reverse Flyes', shoulders_id, 'Bent-over reverse flyes for rear delts.', true, 'https://www.youtube.com/shorts/LsT-bR_zxLo'),
+    ('Arnold Press', shoulders_id, 'Rotational dumbbell press hitting all delt heads.', true, 'https://www.youtube.com/shorts/6K_N9AGhItQ'),
+    ('Upright Row', shoulders_id, 'Barbell or dumbbell upright row for traps and side delts.', true, 'https://www.youtube.com/shorts/AWsGWt-VMl8');
 
   -- BICEPS (6 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Barbell Curl', biceps_id, 'Standing barbell curl for bicep mass.', true),
-    ('Dumbbell Curl', biceps_id, 'Alternating or simultaneous dumbbell curls.', true),
-    ('Hammer Curl', biceps_id, 'Neutral grip dumbbell curls for brachialis.', true),
-    ('Preacher Curl', biceps_id, 'Preacher bench curl for bicep isolation.', true),
-    ('Concentration Curl', biceps_id, 'Seated single-arm concentration curl.', true),
-    ('Cable Curl', biceps_id, 'Standing cable curl for constant tension.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Barbell Curl', biceps_id, 'Standing barbell curl for bicep mass.', true, 'https://www.youtube.com/shorts/54x2WF1_Suc'),
+    ('Dumbbell Curl', biceps_id, 'Alternating or simultaneous dumbbell curls.', true, 'https://www.youtube.com/shorts/iui51E31sX8'),
+    ('Hammer Curl', biceps_id, 'Neutral grip dumbbell curls for brachialis.', true, 'https://www.youtube.com/shorts/8H5oWMNWWeQ'),
+    ('Preacher Curl', biceps_id, 'Preacher bench curl for bicep isolation.', true, 'https://www.youtube.com/shorts/Htw-s61mOw0'),
+    ('Concentration Curl', biceps_id, 'Seated single-arm concentration curl.', true, 'https://www.youtube.com/shorts/EjUnEEfTSEY'),
+    ('Cable Curl', biceps_id, 'Standing cable curl for constant tension.', true, 'https://www.youtube.com/shorts/CrbTqNOlFgE');
 
   -- TRICEPS (6 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Tricep Pushdown', triceps_id, 'Cable pushdown with rope or bar attachment.', true),
-    ('Skull Crushers', triceps_id, 'Lying tricep extension with EZ bar or dumbbells.', true),
-    ('Close-Grip Bench Press', triceps_id, 'Narrow grip bench press for tricep emphasis.', true),
-    ('Overhead Tricep Extension', triceps_id, 'Dumbbell or cable overhead extension.', true),
-    ('Tricep Dips', triceps_id, 'Upright dips emphasizing triceps.', true),
-    ('Diamond Push-Ups', triceps_id, 'Close-hand push-ups targeting triceps.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Tricep Pushdown', triceps_id, 'Cable pushdown with rope or bar attachment.', true, 'https://www.youtube.com/shorts/Rc7-euA8FDI'),
+    ('Skull Crushers', triceps_id, 'Lying tricep extension with EZ bar or dumbbells.', true, 'https://www.youtube.com/shorts/D1y1-sXZDA0'),
+    ('Close-Grip Bench Press', triceps_id, 'Narrow grip bench press for tricep emphasis.', true, 'https://www.youtube.com/shorts/4yKLxOsrGfg'),
+    ('Overhead Tricep Extension', triceps_id, 'Dumbbell or cable overhead extension.', true, 'https://www.youtube.com/shorts/b_r_LW4HEcM'),
+    ('Tricep Dips', triceps_id, 'Upright dips emphasizing triceps.', true, 'https://www.youtube.com/shorts/9llvBAV4RHI'),
+    ('Diamond Push-Ups', triceps_id, 'Close-hand push-ups targeting triceps.', true, 'https://www.youtube.com/shorts/PPTj-MW2tcs');
 
   -- LEGS (10 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Barbell Squat', legs_id, 'Back squat with barbell. King of leg exercises.', true),
-    ('Front Squat', legs_id, 'Front-loaded barbell squat for quads.', true),
-    ('Leg Press', legs_id, 'Machine leg press for quad and glute development.', true),
-    ('Romanian Deadlift', legs_id, 'Stiff-leg deadlift variation for hamstrings.', true),
-    ('Leg Extension', legs_id, 'Machine leg extension for quad isolation.', true),
-    ('Leg Curl', legs_id, 'Machine hamstring curl — lying or seated.', true),
-    ('Bulgarian Split Squat', legs_id, 'Rear-foot elevated single-leg squat.', true),
-    ('Walking Lunges', legs_id, 'Forward walking lunges with dumbbells or barbell.', true),
-    ('Calf Raises', legs_id, 'Standing or seated calf raises.', true),
-    ('Hack Squat', legs_id, 'Machine hack squat for quad focus.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Barbell Squat', legs_id, 'Back squat with barbell. King of leg exercises.', true, 'https://www.youtube.com/shorts/iZTxa8NJH2g'),
+    ('Front Squat', legs_id, 'Front-loaded barbell squat for quads.', true, 'https://www.youtube.com/shorts/_qv0m3tPd3s'),
+    ('Leg Press', legs_id, 'Machine leg press for quad and glute development.', true, 'https://www.youtube.com/shorts/nDh_BlnLCGc'),
+    ('Romanian Deadlift', legs_id, 'Stiff-leg deadlift variation for hamstrings.', true, 'https://www.youtube.com/shorts/5rIqP63yWFg'),
+    ('Leg Extension', legs_id, 'Machine leg extension for quad isolation.', true, 'https://www.youtube.com/shorts/uM86QE59Tgc'),
+    ('Leg Curl', legs_id, 'Machine hamstring curl — lying or seated.', true, 'https://www.youtube.com/shorts/_lgE0gPvbik'),
+    ('Bulgarian Split Squat', legs_id, 'Rear-foot elevated single-leg squat.', true, 'https://www.youtube.com/shorts/uODWo4YqbT8'),
+    ('Walking Lunges', legs_id, 'Forward walking lunges with dumbbells or barbell.', true, 'https://www.youtube.com/shorts/1cS-6KsJW9g'),
+    ('Calf Raises', legs_id, 'Standing or seated calf raises.', true, 'https://www.youtube.com/shorts/a-x_NR-ibos'),
+    ('Hack Squat', legs_id, 'Machine hack squat for quad focus.', true, 'https://www.youtube.com/shorts/g9i05umL5vc');
 
   -- GLUTES (5 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Hip Thrust', glutes_id, 'Barbell hip thrust for glute activation and strength.', true),
-    ('Glute Bridge', glutes_id, 'Bodyweight or weighted glute bridge.', true),
-    ('Cable Kickback', glutes_id, 'Cable glute kickback for isolation.', true),
-    ('Sumo Deadlift', glutes_id, 'Wide-stance deadlift emphasizing glutes and inner thighs.', true),
-    ('Step-Ups', glutes_id, 'Weighted step-ups onto a box or bench.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Hip Thrust', glutes_id, 'Barbell hip thrust for glute activation and strength.', true, 'https://www.youtube.com/shorts/_i6qpcI1Nw4'),
+    ('Glute Bridge', glutes_id, 'Bodyweight or weighted glute bridge.', true, 'https://www.youtube.com/shorts/X_IGw8U_e38'),
+    ('Cable Kickback', glutes_id, 'Cable glute kickback for isolation.', true, 'https://www.youtube.com/shorts/A9aN_L4vexk'),
+    ('Sumo Deadlift', glutes_id, 'Wide-stance deadlift emphasizing glutes and inner thighs.', true, 'https://www.youtube.com/shorts/e7oLkRlT2CQ'),
+    ('Step-Ups', glutes_id, 'Weighted step-ups onto a box or bench.', true, 'https://www.youtube.com/shorts/8q9LVgN2RD4');
 
   -- CORE (7 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Plank', core_id, 'Isometric plank hold for core stability.', true),
-    ('Hanging Leg Raise', core_id, 'Hanging from bar, raise legs for lower abs.', true),
-    ('Cable Woodchop', core_id, 'Rotational cable movement for obliques.', true),
-    ('Ab Wheel Rollout', core_id, 'Ab wheel for full core engagement.', true),
-    ('Russian Twist', core_id, 'Seated twist with weight for obliques.', true),
-    ('Crunches', core_id, 'Basic crunch for upper abs.', true),
-    ('Dead Bug', core_id, 'Anti-extension core exercise for stability.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Plank', core_id, 'Isometric plank hold for core stability.', true, 'https://www.youtube.com/shorts/v25dawSzRTM'),
+    ('Hanging Leg Raise', core_id, 'Hanging from bar, raise legs for lower abs.', true, 'https://www.youtube.com/shorts/XQc0WHO90Lk'),
+    ('Cable Woodchop', core_id, 'Rotational cable movement for obliques.', true, 'https://www.youtube.com/shorts/BrXm1kg4SKI'),
+    ('Ab Wheel Rollout', core_id, 'Ab wheel for full core engagement.', true, 'https://www.youtube.com/shorts/MinlHnG7j4k'),
+    ('Russian Twist', core_id, 'Seated twist with weight for obliques.', true, 'https://www.youtube.com/shorts/iFQV6q4xRXM'),
+    ('Crunches', core_id, 'Basic crunch for upper abs.', true, 'https://www.youtube.com/shorts/GSjm29FESiQ'),
+    ('Dead Bug', core_id, 'Anti-extension core exercise for stability.', true, 'https://www.youtube.com/shorts/-8xqJ2xXs2A');
 
   -- CARDIO (5 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Treadmill Run', cardio_id, 'Running on treadmill at various speeds and inclines.', true),
-    ('Rowing Machine', cardio_id, 'Full-body cardio on rowing ergometer.', true),
-    ('Cycling', cardio_id, 'Stationary bike or outdoor cycling.', true),
-    ('Jump Rope', cardio_id, 'Skipping rope for cardiovascular conditioning.', true),
-    ('Stair Climber', cardio_id, 'Stair climbing machine for leg endurance and cardio.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Treadmill Run', cardio_id, 'Running on treadmill at various speeds and inclines.', true, 'https://www.youtube.com/shorts/7HkQrFoufhc'),
+    ('Rowing Machine', cardio_id, 'Full-body cardio on rowing ergometer.', true, 'https://www.youtube.com/shorts/bCxq4zMHpzs'),
+    ('Cycling', cardio_id, 'Stationary bike or outdoor cycling.', true, 'https://www.youtube.com/shorts/dieOsJlsvpM'),
+    ('Jump Rope', cardio_id, 'Skipping rope for cardiovascular conditioning.', true, 'https://www.youtube.com/shorts/Gt9hlRMXDXc'),
+    ('Stair Climber', cardio_id, 'Stair climbing machine for leg endurance and cardio.', true, 'https://www.youtube.com/shorts/6mYp_BNYD5Y');
 
   -- FULL BODY (5 exercises)
-  insert into public.exercises (name, muscle_group_id, description, is_approved) values
-    ('Burpees', full_body_id, 'Full-body explosive movement combining squat, push-up, and jump.', true),
-    ('Clean and Press', full_body_id, 'Barbell clean from floor to overhead press.', true),
-    ('Kettlebell Swing', full_body_id, 'Hip-hinge kettlebell swing for posterior chain and cardio.', true),
-    ('Turkish Get-Up', full_body_id, 'Complex floor-to-standing movement with weight overhead.', true),
-    ('Thrusters', full_body_id, 'Front squat into overhead press in one fluid movement.', true);
+  insert into public.exercises (name, muscle_group_id, description, is_approved, video_url) values
+    ('Burpees', full_body_id, 'Full-body explosive movement combining squat, push-up, and jump.', true, 'https://www.youtube.com/shorts/IU39YnTL3Pk'),
+    ('Clean and Press', full_body_id, 'Barbell clean from floor to overhead press.', true, 'https://www.youtube.com/shorts/gzB8lu2MZ6Y'),
+    ('Kettlebell Swing', full_body_id, 'Hip-hinge kettlebell swing for posterior chain and cardio.', true, 'https://www.youtube.com/shorts/RyPgfIvNvN0'),
+    ('Turkish Get-Up', full_body_id, 'Complex floor-to-standing movement with weight overhead.', true, 'https://www.youtube.com/shorts/g5dwOlGGfmU'),
+    ('Thrusters', full_body_id, 'Front squat into overhead press in one fluid movement.', true, 'https://www.youtube.com/shorts/XvhRYWgekT4');
 
   -- ============================================
   -- PRE-BUILT PROGRAMS
