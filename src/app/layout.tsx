@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import BottomNav from "@/components/navigation/BottomNav";
+import { WeightUnitProvider } from "@/context/WeightUnitContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -45,8 +46,10 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <main className="flex-1 pb-20">{children}</main>
-        <BottomNav />
+        <WeightUnitProvider>
+          <main className="flex-1 pb-20">{children}</main>
+          <BottomNav />
+        </WeightUnitProvider>
       </body>
     </html>
   );

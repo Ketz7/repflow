@@ -4,6 +4,7 @@ export interface UserProfile {
   display_name: string;
   avatar_url: string | null;
   is_admin: boolean;
+  weight_unit: "kg" | "lbs";
   created_at: string;
 }
 

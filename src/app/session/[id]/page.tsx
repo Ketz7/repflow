@@ -10,6 +10,7 @@ import YouTubeEmbed from "@/components/exercises/YouTubeEmbed";
 import SessionStats from "@/components/workout/SessionStats";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDuration } from "@/lib/utils";
+import { useWeightUnit } from "@/context/WeightUnitContext";
 
 interface SetEntry {
   set_number: number;
@@ -29,6 +30,7 @@ interface ExerciseState {
 export default function SessionPage() {
   const params = useParams();
   const router = useRouter();
+  const { unitLabel } = useWeightUnit();
   const [exercises, setExercises] = useState<ExerciseState[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -267,7 +269,7 @@ export default function SessionPage() {
               <div className="grid grid-cols-[40px_1fr_1fr_48px] gap-2 px-2 text-xs text-subtext">
                 <span>Set</span>
                 <span>Reps</span>
-                <span>Weight</span>
+                <span>Weight ({unitLabel})</span>
                 <span className="text-center">Done</span>
               </div>
               {current.sets.map((set, si) => (

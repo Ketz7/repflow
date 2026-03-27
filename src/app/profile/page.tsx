@@ -9,6 +9,7 @@ import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useWeightUnit } from "@/context/WeightUnitContext";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function ProfilePage() {
   const [weightSaved, setWeightSaved] = useState(false);
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const { unit, setUnit } = useWeightUnit();
 
   useEffect(() => {
     async function load() {
@@ -118,11 +120,31 @@ export default function ProfilePage() {
         {profile?.is_admin && <Badge variant="warning">Admin</Badge>}
       </div>
 
+      {/* Weight Unit Toggle */}
+      <div className="rounded-2xl bg-card border border-border p-4 mb-4">
+        <h2 className="text-sm font-semibold text-foreground mb-3">Weight Unit</h2>
+        <div className="flex gap-2">
+          {(["kg", "lbs"] as const).map((u) => (
+            <button
+              key={u}
+              onClick={() => setUnit(u)}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                unit === u
+                  ? "bg-primary text-background"
+                  : "bg-surface border border-border text-subtext"
+              }`}
+            >
+              {u === "kg" ? "Kilograms (kg)" : "Pounds (lbs)"}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Quick Weight Log */}
       <div className="rounded-2xl bg-card border border-border p-5 mb-4">
         <h2 className="text-sm font-semibold text-foreground mb-3">
           Log Today&apos;s Weight
-          {todayWeight && <span className="text-subtext font-normal ml-2">(logged: {todayWeight} kg)</span>}
+          {todayWeight && <span className="text-subtext font-normal ml-2">(logged: {todayWeight} {unit})</span>}
         </h2>
         <div className="flex items-center gap-2 mb-3">
           <button

@@ -8,6 +8,7 @@ import Badge from "@/components/ui/Badge";
 import WeightChart from "@/components/charts/WeightChart";
 import { formatDuration, formatDate } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useWeightUnit } from "@/context/WeightUnitContext";
 
 interface PersonalRecord {
   exercise_name: string;
@@ -16,6 +17,7 @@ interface PersonalRecord {
 }
 
 export default function ProgressPage() {
+  const { formatWeight, unitLabel } = useWeightUnit();
   const [tab, setTab] = useState<"weight" | "history" | "records">("weight");
   const [weightLogs, setWeightLogs] = useState<BodyWeightLog[]>([]);
   const [sessions, setSessions] = useState<(WorkoutSession & { program_workout?: { name: string } })[]>([]);
@@ -133,7 +135,7 @@ export default function ProgressPage() {
                        "➡️ Maintaining"}
                     </p>
                     <p className="text-xs text-subtext mt-0.5">
-                      {Math.abs(diff).toFixed(1)} kg {trend === "losing" ? "lost" : trend === "gaining" ? "gained" : "change"} in the last 7 entries
+                      {formatWeight(Math.abs(diff))} {unitLabel} {trend === "losing" ? "lost" : trend === "gaining" ? "gained" : "change"} in the last 7 entries
                     </p>
                   </div>
                 );
@@ -197,7 +199,7 @@ export default function ProgressPage() {
                   <p className="text-sm font-medium text-foreground">{pr.exercise_name}</p>
                   <p className="text-xs text-subtext">{formatDate(pr.date)}</p>
                 </div>
-                <Badge variant="primary">{pr.max_weight} kg</Badge>
+                <Badge variant="primary">{formatWeight(pr.max_weight)} {unitLabel}</Badge>
               </motion.div>
             ))
           ) : (

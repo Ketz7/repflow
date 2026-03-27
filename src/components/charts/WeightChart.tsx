@@ -11,12 +11,14 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { BodyWeightLog } from "@/types";
+import { useWeightUnit } from "@/context/WeightUnitContext";
 
 interface WeightChartProps {
   data: BodyWeightLog[];
 }
 
 export default function WeightChart({ data }: WeightChartProps) {
+  const { unitLabel } = useWeightUnit();
   const chartData = useMemo(() => {
     return data.map((entry, i) => {
       // 7-day moving average
@@ -35,7 +37,7 @@ export default function WeightChart({ data }: WeightChartProps) {
 
   return (
     <div className="rounded-2xl bg-card border border-border p-4">
-      <h3 className="text-sm font-semibold text-foreground mb-3">Body Weight</h3>
+      <h3 className="text-sm font-semibold text-foreground mb-3">Body Weight ({unitLabel})</h3>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={chartData}>

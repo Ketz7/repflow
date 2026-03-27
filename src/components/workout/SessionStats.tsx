@@ -6,6 +6,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { formatDuration, calculateVolume } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { useWeightUnit } from "@/context/WeightUnitContext";
 
 interface ExerciseState {
   exercise_id: string;
@@ -23,6 +24,7 @@ interface SessionStatsProps {
 }
 
 export default function SessionStats({ duration, exercises, sessionId, onClose }: SessionStatsProps) {
+  const { formatWeight, unitLabel } = useWeightUnit();
   const [previousSets, setPreviousSets] = useState<Map<string, { reps: number; weight: number }[]>>(new Map());
   const [prs, setPrs] = useState<{ exerciseName: string; type: string; value: string }[]>([]);
 
@@ -79,7 +81,7 @@ export default function SessionStats({ duration, exercises, sessionId, onClose }
           newPrs.push({
             exerciseName: ex.exercise.name,
             type: "Weight PR",
-            value: `${maxWeight} kg`,
+            value: `${formatWeight(maxWeight)} ${unitLabel}`,
           });
         }
       }
@@ -158,7 +160,7 @@ export default function SessionStats({ duration, exercises, sessionId, onClose }
           className="rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 p-4 mb-6 text-center"
         >
           <p className="text-xs text-subtext">Total Volume</p>
-          <p className="text-2xl font-bold text-primary">{totalVolume.toLocaleString()} kg</p>
+          <p className="text-2xl font-bold text-primary">{formatWeight(totalVolume).toLocaleString()} {unitLabel}</p>
         </motion.div>
       )}
 
@@ -229,12 +231,12 @@ export default function SessionStats({ duration, exercises, sessionId, onClose }
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-sm font-medium text-foreground">{ex.exercise.name}</span>
                     <Badge variant={volumeDiff > 0 ? "success" : volumeDiff < 0 ? "error" : "default"}>
-                      {volumeDiff > 0 ? `↑ ${volumeDiff}kg` : volumeDiff < 0 ? `↓ ${Math.abs(volumeDiff)}kg` : "—"}
+                      {volumeDiff > 0 ? `↑ ${formatWeight(volumeDiff)}${unitLabel}` : volumeDiff < 0 ? `↓ ${formatWeight(Math.abs(volumeDiff))}${unitLabel}` : "—"}
                     </Badge>
                   </div>
                   <p className="text-xs text-subtext">
                     {completed.length} sets · {completed.reduce((s, c) => s + c.reps_completed, 0)} reps
-                    {currentVolume > 0 ? ` · ${currentVolume}kg vol` : ""}
+                    {currentVolume > 0 ? ` · ${formatWeight(currentVolume)}${unitLabel} vol` : ""}
                   </p>
                 </div>
               );
