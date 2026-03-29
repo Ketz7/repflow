@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import BottomNav from "@/components/navigation/BottomNav";
 import OnboardingTour from "@/components/OnboardingTour";
+import InstallPrompt from "@/components/InstallPrompt";
 import { WeightUnitProvider } from "@/context/WeightUnitContext";
 import "./globals.css";
 
@@ -76,6 +77,7 @@ export default function RootLayout({
           <main className="flex-1 pb-20">{children}</main>
           <BottomNav />
           <OnboardingTour />
+          <InstallPrompt />
         </WeightUnitProvider>
       </body>
     </html>
