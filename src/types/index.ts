@@ -102,7 +102,11 @@ export interface BodyWeightLog {
   id: string;
   user_id: string;
   date: string;
-  weight: number;
+  weight: number | null;
+  steps: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
   created_at: string;
 }
 

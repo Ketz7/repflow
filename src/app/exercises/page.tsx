@@ -130,7 +130,7 @@ export default function ExercisesPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                     onClick={() => setSelectedExercise(ex)}
-                    className="w-full text-left p-3 rounded-xl bg-card border border-border hover:border-primary/30 transition-colors"
+                    className="w-full text-left p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-primary/30 hover:bg-white/8 transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-foreground">{ex.name}</span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
+import { motion } from "framer-motion";
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
@@ -14,26 +15,45 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background">
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 bg-background relative overflow-hidden">
+      {/* Background glow orbs */}
+      <div className="absolute top-1/4 left-1/3 w-64 h-64 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/3 w-48 h-48 bg-accent/10 rounded-full blur-[80px] pointer-events-none" />
+
       {/* Logo / Brand */}
-      <div className="mb-12 text-center">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ type: "spring", stiffness: 200, damping: 20 }}
+        className="mb-12 text-center"
+      >
+        <motion.div
+          initial={{ rotate: -10 }}
+          animate={{ rotate: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
+          className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-[0_8px_32px_rgba(56,189,248,0.3)]"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-10 h-10">
             <path fillRule="evenodd" d="M12.963 2.286a.75.75 0 0 0-1.071-.136 9.742 9.742 0 0 0-3.539 6.176 7.547 7.547 0 0 1-1.705-1.715.75.75 0 0 0-1.152-.082A9 9 0 1 0 15.68 4.534a7.46 7.46 0 0 1-2.717-2.248ZM15.75 14.25a3.75 3.75 0 1 1-7.313-1.172c.628.465 1.35.81 2.133 1a5.99 5.99 0 0 0 1.925-3.546 3.75 3.75 0 0 1 3.255 3.718Z" clipRule="evenodd" />
           </svg>
-        </div>
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">
+        </motion.div>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent tracking-tight">
           RepFlow
         </h1>
         <p className="mt-2 text-subtext text-sm">
           Get in the flow
         </p>
-      </div>
+      </motion.div>
 
       {/* Login Button */}
-      <button
+      <motion.button
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.4 }}
+        whileHover={{ scale: 1.02, borderColor: "rgba(56, 189, 248, 0.5)" }}
+        whileTap={{ scale: 0.98 }}
         onClick={handleGoogleLogin}
-        className="flex items-center gap-3 px-6 py-3.5 rounded-xl bg-card border border-border hover:border-primary/50 transition-all duration-200 active:scale-[0.98]"
+        className="flex items-center gap-3 px-6 py-3.5 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg transition-all duration-200"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path
@@ -56,12 +76,17 @@ export default function LoginPage() {
         <span className="text-foreground font-medium">
           Continue with Google
         </span>
-      </button>
+      </motion.button>
 
       {/* Footer */}
-      <p className="mt-8 text-xs text-subtext/60 text-center max-w-xs">
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.6 }}
+        className="mt-8 text-xs text-subtext/60 text-center max-w-xs"
+      >
         By continuing, you agree to our terms of service and privacy policy
-      </p>
+      </motion.p>
     </div>
   );
 }

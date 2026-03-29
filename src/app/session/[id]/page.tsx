@@ -297,16 +297,19 @@ export default function SessionPage() {
                     min={0}
                     step={0.5}
                   />
-                  <button
+                  <motion.button
                     onClick={() => updateSet(currentIndex, si, "completed", !set.completed)}
+                    whileTap={{ scale: 0.85 }}
+                    animate={set.completed ? { scale: [1, 1.2, 1] } : {}}
+                    transition={{ type: "spring", stiffness: 500, damping: 15 }}
                     className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto transition-all ${
                       set.completed
-                        ? "bg-success text-background"
+                        ? "bg-success text-background shadow-[0_0_12px_rgba(52,211,153,0.4)]"
                         : "bg-surface border border-border text-subtext"
                     }`}
                   >
                     {set.completed ? "✓" : ""}
-                  </button>
+                  </motion.button>
                 </motion.div>
               ))}
             </div>
@@ -342,7 +345,7 @@ export default function SessionPage() {
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
-            className="w-full bg-surface border-t border-border rounded-t-3xl p-6"
+            className="w-full bg-surface/70 backdrop-blur-xl border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.4)] rounded-t-3xl p-6"
           >
             <h3 className="text-lg font-semibold text-foreground mb-2">End Session?</h3>
             <p className="text-sm text-subtext mb-4">

@@ -135,16 +135,23 @@ export default function ProgramsPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-surface rounded-xl mb-5">
+      <div className="relative flex gap-1 p-1 bg-surface/80 backdrop-blur-sm border border-white/5 rounded-xl mb-5">
         {(["browse", "mine"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
-              tab === t ? "bg-card text-foreground" : "text-subtext"
-            }`}
+            className="relative flex-1 py-2 text-sm font-medium rounded-lg transition-colors z-10"
           >
-            {t === "browse" ? "Browse" : "My Programs"}
+            {tab === t && (
+              <motion.div
+                layoutId="programs-tab"
+                className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-lg"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className={`relative z-10 ${tab === t ? "text-primary" : "text-subtext"}`}>
+              {t === "browse" ? "Browse" : "My Programs"}
+            </span>
           </button>
         ))}
       </div>
@@ -157,7 +164,7 @@ export default function ProgramsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="rounded-2xl bg-card border border-border p-4"
+            className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg p-4"
           >
             <div className="flex items-start justify-between mb-2">
               <div>

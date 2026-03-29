@@ -18,7 +18,7 @@ interface PersonalRecord {
 
 export default function ProgressPage() {
   const { formatWeight, unitLabel } = useWeightUnit();
-  const [tab, setTab] = useState<"weight" | "history" | "records">("weight");
+  const [tab, setTab] = useState<"weight" | "nutrition" | "history" | "records">("weight");
   const [weightLogs, setWeightLogs] = useState<BodyWeightLog[]>([]);
   const [sessions, setSessions] = useState<(WorkoutSession & { program_workout?: { name: string } })[]>([]);
   const [records, setRecords] = useState<PersonalRecord[]>([]);
@@ -97,16 +97,23 @@ export default function ProgressPage() {
       <h1 className="text-2xl font-bold text-foreground mb-4">Progress</h1>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-surface rounded-xl mb-5">
-        {(["weight", "history", "records"] as const).map((t) => (
+      <div className="relative flex gap-1 p-1 bg-surface/80 backdrop-blur-sm border border-white/5 rounded-xl mb-5">
+        {(["weight", "nutrition", "history", "records"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
-              tab === t ? "bg-card text-foreground" : "text-subtext"
-            }`}
+            className="relative flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize z-10"
           >
-            {t}
+            {tab === t && (
+              <motion.div
+                layoutId="progress-tab"
+                className="absolute inset-0 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-lg"
+                transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              />
+            )}
+            <span className={`relative z-10 ${tab === t ? "text-primary" : "text-subtext"}`}>
+              {t}
+            </span>
           </button>
         ))}
       </div>
@@ -119,8 +126,8 @@ export default function ProgressPage() {
               {/* Trend indicator */}
               {weightLogs.length >= 7 && (() => {
                 const recent = weightLogs.slice(-7);
-                const first = recent[0].weight;
-                const last = recent[recent.length - 1].weight;
+                const first = recent[0].weight ?? 0;
+                const last = recent[recent.length - 1].weight ?? 0;
                 const diff = last - first;
                 const trend = diff < -0.2 ? "losing" : diff > 0.2 ? "gaining" : "maintaining";
                 return (
@@ -145,6 +152,68 @@ export default function ProgressPage() {
             <div className="rounded-2xl bg-card border border-border p-8 text-center">
               <p className="text-subtext text-sm mb-2">No weight data yet.</p>
               <p className="text-xs text-subtext/60">Log your weight from the Profile tab.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === "nutrition" && (
+        <div>
+          {weightLogs.some((l) => l.steps || l.protein || l.carbs || l.fat) ? (
+            <div className="space-y-3">
+              {/* Recent daily summaries */}
+              {[...weightLogs]
+                .filter((l) => l.steps || l.protein || l.carbs || l.fat)
+                .reverse()
+                .slice(0, 14)
+                .map((log, i) => {
+                  const totalCal = Math.round(
+                    ((log.protein || 0) * 4) + ((log.carbs || 0) * 4) + ((log.fat || 0) * 9)
+                  );
+                  return (
+                    <motion.div
+                      key={log.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.03 }}
+                      className="p-3 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-foreground">{formatDate(log.date)}</span>
+                        {totalCal > 0 && (
+                          <Badge variant="primary">{totalCal} kcal</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-xs">
+                        {log.steps != null && (
+                          <span className="text-subtext">
+                            <span className="text-foreground font-medium">{log.steps.toLocaleString()}</span> steps
+                          </span>
+                        )}
+                        {log.protein != null && (
+                          <span className="text-subtext">
+                            <span className="text-primary font-medium">{log.protein}g</span> P
+                          </span>
+                        )}
+                        {log.carbs != null && (
+                          <span className="text-subtext">
+                            <span className="text-accent font-medium">{log.carbs}g</span> C
+                          </span>
+                        )}
+                        {log.fat != null && (
+                          <span className="text-subtext">
+                            <span className="text-warning font-medium">{log.fat}g</span> F
+                          </span>
+                        )}
+                      </div>
+                    </motion.div>
+                  );
+                })}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-card border border-border p-8 text-center">
+              <p className="text-subtext text-sm mb-2">No nutrition data yet.</p>
+              <p className="text-xs text-subtext/60">Log steps and macros from the Profile tab.</p>
             </div>
           )}
         </div>

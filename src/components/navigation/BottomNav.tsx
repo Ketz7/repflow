@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 
 const tabs = [
   {
@@ -19,6 +20,15 @@ const tabs = [
     icon: (active: boolean) => (
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? 0 : 1.5} className="w-6 h-6">
         <path strokeLinecap="round" strokeLinejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L21.75 12l-4.179 2.25m0 0 4.179 2.25L12 21.75 2.25 16.5l4.179-2.25m11.142 0-5.571 3-5.571-3" />
+      </svg>
+    ),
+  },
+  {
+    name: "Exercises",
+    href: "/exercises",
+    icon: (active: boolean) => (
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5} className="w-6 h-6">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 12h1m14 0h1M6.5 8v8m11-8v8M8.5 6v12m7-12v12M10.5 10v4m3-4v4" />
       </svg>
     ),
   },
@@ -70,12 +80,25 @@ export default function BottomNav() {
             <Link
               key={tab.name}
               href={tab.href}
-              className={`flex flex-col items-center justify-center gap-0.5 w-16 py-1 transition-colors duration-200 ${
-                isActive ? "text-primary" : "text-subtext"
-              }`}
+              className="relative flex flex-col items-center justify-center gap-0.5 flex-1 py-1"
             >
-              {tab.icon(isActive)}
-              <span className="text-[10px] font-medium">{tab.name}</span>
+              {isActive && (
+                <motion.div
+                  layoutId="nav-pill"
+                  className="absolute inset-0 mx-1 rounded-xl bg-primary/10 border border-primary/20"
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
+              <motion.div
+                animate={{ scale: isActive ? 1.05 : 1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className={`relative z-10 transition-colors duration-200 ${isActive ? "text-primary" : "text-subtext"}`}
+              >
+                {tab.icon(isActive)}
+              </motion.div>
+              <span className={`relative z-10 text-[10px] font-medium transition-colors duration-200 ${isActive ? "text-primary" : "text-subtext"}`}>
+                {tab.name}
+              </span>
             </Link>
           );
         })}

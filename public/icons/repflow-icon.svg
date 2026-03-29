@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background gradient -->
+    <radialGradient id="bg" cx="50%" cy="40%" r="68%">
+      <stop offset="0%" stop-color="#141D32"/>
+      <stop offset="100%" stop-color="#0B1120"/>
+    </radialGradient>
+
+    <!-- Primary gradient -->
+    <linearGradient id="primary" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5CCBFF"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+
+    <!-- Accent gradient -->
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="40%" stop-color="#2DD4BF"/>
+      <stop offset="100%" stop-color="#14B8A6"/>
+    </linearGradient>
+
+    <!-- Full sweep gradient -->
+    <linearGradient id="sweep" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#2DD4BF"/>
+    </linearGradient>
+
+    <!-- Icon glow -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="b"/>
+      <feFlood flood-color="#38BDF8" flood-opacity="0.25"/>
+      <feComposite in2="b" operator="in" result="g"/>
+      <feMerge>
+        <feMergeNode in="g"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Wave glow -->
+    <filter id="waveGlow" x="-20%" y="-30%" width="140%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+      <feFlood flood-color="#2DD4BF" flood-opacity="0.2"/>
+      <feComposite in2="b" operator="in" result="g"/>
+      <feMerge>
+        <feMergeNode in="g"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- ======================== BACKGROUND ======================== -->
+  <rect width="512" height="512" rx="112" ry="112" fill="url(#bg)"/>
+
+  <!-- Subtle depth rings -->
+  <circle cx="256" cy="240" r="156" fill="none" stroke="#38BDF8" stroke-opacity="0.025" stroke-width="80"/>
+
+  <!-- ======================== MAIN MARK ======================== -->
+
+  <!-- THE ARROW — bold upward chevron, single peak point -->
+  <g filter="url(#glow)">
+    <path d="M 118 350 L 256 132 L 394 350"
+          stroke="url(#primary)" stroke-width="54" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+
+  <!-- THE FLOW — sinuous wave weaving through lower portion of chevron arms -->
+  <g filter="url(#waveGlow)">
+    <path d="M 74 312 C 140 244, 198 380, 256 312 C 314 244, 372 380, 438 312"
+          stroke="url(#accent)" stroke-width="30" stroke-linecap="round" fill="none"/>
+  </g>
+
+</svg>

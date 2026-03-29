@@ -164,7 +164,7 @@ export default function CalendarPage() {
     return (
       <div className="px-4 pt-6 text-center">
         <h1 className="text-2xl font-bold text-foreground mb-4">Calendar</h1>
-        <div className="rounded-2xl bg-card border border-border p-8">
+        <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg p-8">
           <p className="text-subtext text-sm mb-4">No active phase. Create one to start your training cycle.</p>
           <Button onClick={() => setShowCreatePhase(true)}>Create Phase</Button>
         </div>

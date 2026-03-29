@@ -125,7 +125,9 @@ export default function SessionStats({ duration, exercises, sessionId, onClose }
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-8"
       >
-        <h1 className="text-2xl font-bold text-foreground mb-1">Workout Complete</h1>
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent mb-1">
+          Workout Complete
+        </h1>
         <p className="text-subtext text-sm">Great session!</p>
       </motion.div>
 
@@ -142,7 +144,7 @@ export default function SessionStats({ duration, exercises, sessionId, onClose }
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="rounded-xl bg-card border border-border p-4 text-center"
+            className="rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg p-4 text-center"
           >
             <span className="text-2xl">{stat.icon}</span>
             <p className="text-xl font-bold text-foreground mt-1">{stat.value}</p>

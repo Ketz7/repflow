@@ -23,17 +23,18 @@ export default function WeightChart({ data }: WeightChartProps) {
     return data.map((entry, i) => {
       // 7-day moving average
       const window = data.slice(Math.max(0, i - 6), i + 1);
-      const avg = window.reduce((sum, e) => sum + e.weight, 0) / window.length;
+      const avg = window.reduce((sum, e) => sum + (e.weight ?? 0), 0) / window.length;
       return {
         date: new Date(entry.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        weight: entry.weight,
+        weight: entry.weight ?? 0,
         average: parseFloat(avg.toFixed(1)),
       };
     });
   }, [data]);
 
-  const minWeight = Math.floor(Math.min(...data.map((d) => d.weight)) - 2);
-  const maxWeight = Math.ceil(Math.max(...data.map((d) => d.weight)) + 2);
+  const weights = data.map((d) => d.weight ?? 0).filter((w) => w > 0);
+  const minWeight = weights.length ? Math.floor(Math.min(...weights) - 2) : 0;
+  const maxWeight = weights.length ? Math.ceil(Math.max(...weights) + 2) : 100;
 
   return (
     <div className="rounded-2xl bg-card border border-border p-4">

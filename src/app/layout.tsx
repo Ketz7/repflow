@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import BottomNav from "@/components/navigation/BottomNav";
+import OnboardingTour from "@/components/OnboardingTour";
 import { WeightUnitProvider } from "@/context/WeightUnitContext";
 import "./globals.css";
 
@@ -22,6 +23,10 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "RepFlow",
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icons/apple-touch-icon.png",
   },
 };
 
@@ -49,6 +54,7 @@ export default function RootLayout({
         <WeightUnitProvider>
           <main className="flex-1 pb-20">{children}</main>
           <BottomNav />
+          <OnboardingTour />
         </WeightUnitProvider>
       </body>
     </html>
