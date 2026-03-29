@@ -28,6 +28,27 @@ export const metadata: Metadata = {
     icon: "/favicon.ico",
     apple: "/icons/apple-touch-icon.png",
   },
+  openGraph: {
+    title: "RepFlow",
+    description: "Get in the flow — workouts, programs, and progress",
+    url: "https://repflow-one.vercel.app",
+    siteName: "RepFlow",
+    images: [
+      {
+        url: "https://repflow-one.vercel.app/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "RepFlow — fitness tracker PWA",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "RepFlow",
+    description: "Get in the flow — workouts, programs, and progress",
+    images: ["https://repflow-one.vercel.app/og-image.png"],
+  },
 };
 
 export const viewport: Viewport = {
