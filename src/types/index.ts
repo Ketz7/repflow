@@ -121,3 +121,73 @@ export interface ExerciseSubmission {
   reviewed_by: string | null;
   created_at: string;
 }
+
+export interface CoachProfile {
+  id: string;
+  user_id: string;
+  bio: string;
+  experience: string;
+  photo_url: string | null;
+  status: "pending" | "approved" | "suspended";
+  max_clients: number;
+  monthly_rate: number | null;
+  created_at: string;
+  user?: UserProfile;
+}
+
+export interface CoachClient {
+  id: string;
+  coach_id: string;
+  client_id: string;
+  status: "pending" | "active" | "expired";
+  initiated_by: "coach" | "client";
+  started_at: string | null;
+  expires_at: string | null;
+  price: number | null;
+  notes: string | null;
+  created_at: string;
+  client?: UserProfile;
+  coach_profile?: CoachProfile;
+}
+
+export interface MacroTarget {
+  id: string;
+  coach_client_id: string;
+  protein: number;
+  carbs: number;
+  fat: number;
+  effective_date: string;
+  created_at: string;
+}
+
+export interface CoachProgramAssignment {
+  id: string;
+  coach_client_id: string;
+  program_id: string;
+  duration_weeks: number | null;
+  started_at: string;
+  ended_at: string | null;
+  status: "active" | "completed" | "swapped";
+  created_at: string;
+  program?: Program;
+}
+
+export interface CoachSubscription {
+  id: string;
+  coach_id: string;
+  base_fee: number;
+  per_client_fee: number;
+  status: "active" | "expired" | "cancelled";
+  current_period_start: string;
+  current_period_end: string;
+  created_at: string;
+}
+
+export interface UserAgreement {
+  id: string;
+  user_id: string;
+  document_type: "tos" | "coaching_waiver";
+  document_version: string;
+  accepted_at: string;
+  ip_address: string | null;
+}
