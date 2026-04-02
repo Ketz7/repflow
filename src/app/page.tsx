@@ -12,6 +12,8 @@ export default function HomePage() {
   const [weekSessions, setWeekSessions] = useState(0);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [isCoach, setIsCoach] = useState(false);
+  const [showCoachView, setShowCoachView] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -20,6 +22,14 @@ export default function HomePage() {
       if (!user) return;
 
       setFirstName(user.user_metadata?.full_name?.split(" ")[0] || "Athlete");
+
+      // Check if user is an approved coach
+      const { data: coachProfile } = await supabase
+        .from("coach_profiles")
+        .select("status")
+        .eq("user_id", user.id)
+        .single();
+      if (coachProfile?.status === "approved") setIsCoach(true);
 
       // Get active phase
       const { data: phases } = await supabase
@@ -114,8 +124,42 @@ export default function HomePage() {
         </h1>
       </motion.div>
 
+      {/* Coach Toggle */}
+      {isCoach && (
+        <div className="flex bg-surface rounded-xl p-1 mb-4">
+          <button
+            onClick={() => setShowCoachView(false)}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+              !showCoachView ? "bg-primary/15 text-primary" : "text-subtext"
+            }`}
+          >
+            My Workouts
+          </button>
+          <button
+            onClick={() => setShowCoachView(true)}
+            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+              showCoachView ? "bg-primary/15 text-primary" : "text-subtext"
+            }`}
+          >
+            My Clients
+          </button>
+        </div>
+      )}
+
+      {/* Coach View */}
+      {showCoachView && (
+        <div className="space-y-4">
+          <Link href="/coach/dashboard" className="block">
+            <div className="bg-white/[0.05] backdrop-blur-sm border border-white/10 rounded-2xl p-6 text-center hover:border-primary/30 transition-colors">
+              <h3 className="text-lg font-semibold text-foreground mb-2">Coach Dashboard</h3>
+              <p className="text-sm text-subtext">View and manage your clients</p>
+            </div>
+          </Link>
+        </div>
+      )}
+
       {/* Today's Workout Card — glassmorphism */}
-      <motion.div
+      {!showCoachView && (<><motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
@@ -210,7 +254,7 @@ export default function HomePage() {
           </p>
           <p className="text-subtext text-xs">days</p>
         </motion.div>
-      </div>
+      </div></>)}
     </div>
   );
 }

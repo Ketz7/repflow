@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import type { UserProfile } from "@/types";
+import type { UserProfile, CoachProfile, CoachClient, MacroTarget } from "@/types";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
@@ -24,6 +24,10 @@ export default function ProfilePage() {
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
   const [todayLog, setTodayLog] = useState<{ steps: number | null; protein: number | null; carbs: number | null; fat: number | null } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [coachProfile, setCoachProfile] = useState<CoachProfile | null>(null);
+  const [coachRelationship, setCoachRelationship] = useState<CoachClient | null>(null);
+  const [macroTarget, setMacroTarget] = useState<MacroTarget | null>(null);
+  const [pendingCoachInvite, setPendingCoachInvite] = useState<(CoachClient & { coach_profile?: CoachProfile & { user?: UserProfile } }) | null>(null);
   const { unit, setUnit } = useWeightUnit();
 
   useEffect(() => {
@@ -60,6 +64,48 @@ export default function ProfilePage() {
         if (existingLog.fat) setFat(existingLog.fat.toString());
         setTodayLog({ steps: existingLog.steps, protein: existingLog.protein, carbs: existingLog.carbs, fat: existingLog.fat });
       }
+
+      // Check if user is a coach
+      const { data: coachData } = await supabase
+        .from("coach_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+      if (coachData) setCoachProfile(coachData);
+
+      // Check if user has an active coach
+      const { data: coaching } = await supabase
+        .from("coach_clients")
+        .select("*, coach_profile:coach_profiles(*, user:users(display_name, avatar_url))")
+        .eq("client_id", user.id)
+        .eq("status", "active")
+        .limit(1)
+        .single();
+      if (coaching) {
+        setCoachRelationship(coaching);
+
+        // Load coach's macro targets for this user
+        const { data: target } = await supabase
+          .from("macro_targets")
+          .select("*")
+          .eq("coach_client_id", coaching.id)
+          .lte("effective_date", today)
+          .order("effective_date", { ascending: false })
+          .limit(1)
+          .single();
+        if (target) setMacroTarget(target);
+      }
+
+      // Check for pending coach invites
+      const { data: invite } = await supabase
+        .from("coach_clients")
+        .select("*, coach_profile:coach_profiles(*, user:users(display_name, avatar_url))")
+        .eq("client_id", user.id)
+        .eq("status", "pending")
+        .eq("initiated_by", "coach")
+        .limit(1)
+        .single();
+      if (invite) setPendingCoachInvite(invite);
 
       setLoading(false);
     }
@@ -262,6 +308,53 @@ export default function ProfilePage() {
               Total: {Math.round(((parseFloat(protein) || 0) * 4) + ((parseFloat(carbs) || 0) * 4) + ((parseFloat(fat) || 0) * 9))} kcal
             </p>
           )}
+          {macroTarget && (protein || carbs || fat) && (() => {
+            const actualCal = ((parseFloat(protein) || 0) * 4) + ((parseFloat(carbs) || 0) * 4) + ((parseFloat(fat) || 0) * 9);
+            const targetCal = (macroTarget.protein * 4) + (macroTarget.carbs * 4) + (macroTarget.fat * 9);
+            const diff = actualCal - targetCal;
+            const color = diff <= 0 ? "text-success" : diff <= 300 ? "text-warning" : "text-error";
+            const bgColor = diff <= 0 ? "bg-success/10 border-success/20" : diff <= 300 ? "bg-warning/10 border-warning/20" : "bg-error/10 border-error/20";
+            return (
+              <div className={`mt-3 p-3 rounded-xl border ${bgColor}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-subtext">Coach Target</span>
+                  <span className="text-xs font-medium text-foreground">{Math.round(targetCal)} kcal</span>
+                </div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-xs text-subtext">Your Total</span>
+                  <span className={`text-xs font-medium ${color}`}>{Math.round(actualCal)} kcal</span>
+                </div>
+                {diff > 0 && (
+                  <p className={`text-xs mt-1 ${color}`}>
+                    {Math.round(diff)} kcal over target
+                  </p>
+                )}
+                {diff <= 0 && (
+                  <p className="text-xs mt-1 text-success">On target</p>
+                )}
+                <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-center">
+                    <span className="text-subtext">P: </span>
+                    <span className={(parseFloat(protein) || 0) > macroTarget.protein ? "text-warning" : "text-success"}>
+                      {parseFloat(protein) || 0}/{macroTarget.protein}g
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-subtext">C: </span>
+                    <span className={(parseFloat(carbs) || 0) > macroTarget.carbs ? "text-warning" : "text-success"}>
+                      {parseFloat(carbs) || 0}/{macroTarget.carbs}g
+                    </span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-subtext">F: </span>
+                    <span className={(parseFloat(fat) || 0) > macroTarget.fat ? "text-warning" : "text-success"}>
+                      {parseFloat(fat) || 0}/{macroTarget.fat}g
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <Button
@@ -288,6 +381,72 @@ export default function ProfilePage() {
           </div>
         </Link>
       )}
+
+      {/* Coach Invite Banner */}
+      {pendingCoachInvite && (
+        <div className="rounded-2xl bg-primary/10 border border-primary/20 p-4 mb-4">
+          <p className="text-sm font-medium text-foreground mb-1">
+            {pendingCoachInvite.coach_profile?.user?.display_name || "A coach"} wants to coach you
+          </p>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={async () => {
+                const supabase = createClient();
+                await supabase.from("coach_clients").update({ status: "expired" }).eq("id", pendingCoachInvite.id);
+                setPendingCoachInvite(null);
+              }}
+              className="flex-1 py-2 rounded-xl text-sm bg-surface border border-border text-subtext"
+            >
+              Decline
+            </button>
+            <button
+              onClick={async () => {
+                const supabase = createClient();
+                await supabase.from("coach_clients").update({ status: "active", started_at: new Date().toISOString().split("T")[0] }).eq("id", pendingCoachInvite.id);
+                setPendingCoachInvite(null);
+                window.location.reload();
+              }}
+              className="flex-1 py-2 rounded-xl text-sm bg-primary text-background font-medium"
+            >
+              Accept
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Coaching Section */}
+      <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg p-4 mb-4">
+        <h3 className="text-sm font-semibold text-foreground mb-3">Coaching</h3>
+        <div className="space-y-2">
+          {coachProfile?.status === "approved" && (
+            <Link href="/coach/dashboard" className="flex items-center justify-between p-3 bg-primary/10 border border-primary/20 rounded-xl">
+              <span className="text-sm font-medium text-primary">Coach Dashboard</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-primary">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          )}
+          {!coachProfile && (
+            <Link href="/coaches/apply" className="flex items-center justify-between p-3 bg-card border border-border rounded-xl">
+              <span className="text-sm text-foreground">Become a Coach</span>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-subtext">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          )}
+          {coachProfile?.status === "pending" && (
+            <div className="p-3 bg-warning/10 border border-warning/20 rounded-xl">
+              <span className="text-sm text-warning">Coach application under review</span>
+            </div>
+          )}
+          <Link href="/coaches" className="flex items-center justify-between p-3 bg-card border border-border rounded-xl">
+            <span className="text-sm text-foreground">Find a Coach</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4 text-subtext">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
+      </div>
 
       {/* Sign Out */}
       <Button variant="danger" className="w-full" onClick={handleSignOut}>
