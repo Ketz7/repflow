@@ -24,6 +24,7 @@ interface ExerciseState {
   exercise: Exercise & { muscle_group?: { name: string; icon: string } };
   target_sets: number;
   target_reps: number;
+  alternatives: string[];
   sets: SetEntry[];
 }
 
@@ -44,6 +45,7 @@ export default function SessionPage() {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [swapExercises, setSwapExercises] = useState<(Exercise & { muscle_group?: { name: string; icon: string } })[]>([]);
+  const [alternativeExercises, setAlternativeExercises] = useState<(Exercise & { muscle_group?: { name: string; icon: string } })[]>([]);
   const [swapSearch, setSwapSearch] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
@@ -70,11 +72,12 @@ export default function SessionPage() {
 
       if (workoutExercises) {
         setExercises(
-          workoutExercises.map((we: WorkoutExercise & { exercise: Exercise & { muscle_group?: { name: string; icon: string } } }) => ({
+          workoutExercises.map((we: WorkoutExercise & { exercise: Exercise & { muscle_group?: { name: string; icon: string } }; alternatives?: string[] }) => ({
             exercise_id: we.exercise_id,
             exercise: we.exercise,
             target_sets: we.target_sets,
             target_reps: we.target_reps,
+            alternatives: we.alternatives || [],
             sets: Array.from({ length: we.target_sets }, (_, i) => ({
               set_number: i + 1,
               reps_completed: we.target_reps,
@@ -136,12 +139,25 @@ export default function SessionPage() {
 
   const openSwapModal = async () => {
     const supabase = createClient();
+    const currentAlternativeIds = exercises[currentIndex]?.alternatives || [];
+
     const { data } = await supabase
       .from("exercises")
       .select("*, muscle_group:muscle_groups(name, icon)")
       .eq("is_approved", true)
       .order("name");
-    setSwapExercises(data || []);
+
+    const allExercises = data || [];
+    setSwapExercises(allExercises);
+
+    // Filter alternatives from the full list
+    if (currentAlternativeIds.length > 0) {
+      const alts = allExercises.filter((e) => currentAlternativeIds.includes(e.id));
+      setAlternativeExercises(alts);
+    } else {
+      setAlternativeExercises([]);
+    }
+
     setSwapSearch("");
     setShowSwapModal(true);
   };
@@ -416,6 +432,27 @@ export default function SessionPage() {
               />
             </div>
             <div className="flex-1 overflow-y-auto px-4 pb-6">
+              {/* Suggested Alternatives Section */}
+              {alternativeExercises.length > 0 && !swapSearch && (
+                <div className="mb-5">
+                  <p className="text-xs font-medium text-accent uppercase tracking-wider mb-2">Suggested Alternatives</p>
+                  <div className="space-y-1">
+                    {alternativeExercises.map((ex) => (
+                      <button
+                        key={ex.id}
+                        onClick={() => handleSwapExercise(ex)}
+                        className="w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors bg-accent/10 border border-accent/20 text-foreground hover:bg-accent/20"
+                      >
+                        {ex.muscle_group?.icon} {ex.name}
+                        <span className="text-xs text-accent ml-2">recommended</span>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 border-t border-border" />
+                </div>
+              )}
+
+              {/* All Exercises Grouped by Muscle */}
               {Object.entries(
                 swapExercises
                   .filter((e) => e.name.toLowerCase().includes(swapSearch.toLowerCase()))

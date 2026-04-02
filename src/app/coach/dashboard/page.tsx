@@ -129,13 +129,12 @@ export default function CoachDashboardPage() {
     setAddingClient(true);
 
     const supabase = createClient();
-    const { data: targetUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", searchEmail.trim())
-      .single();
+    // Use SECURITY DEFINER function to bypass RLS for email lookup
+    const { data: userId, error } = await supabase.rpc("find_user_by_email", {
+      lookup_email: searchEmail.trim(),
+    });
 
-    if (!targetUser) {
+    if (error || !userId) {
       alert("User not found with that email.");
       setAddingClient(false);
       return;
@@ -143,7 +142,7 @@ export default function CoachDashboardPage() {
 
     await supabase.from("coach_clients").insert({
       coach_id: coachProfile.id,
-      client_id: targetUser.id,
+      client_id: userId,
       initiated_by: "coach",
     });
 

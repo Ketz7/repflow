@@ -53,6 +53,7 @@ export interface WorkoutExercise {
   target_sets: number;
   target_reps: number;
   sort_order: number;
+  alternatives?: string[];
   exercise?: Exercise;
 }
 
