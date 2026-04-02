@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nextdev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "--webpack"],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "static",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "public", "-l", "3456"],
+      "port": 3456,
+      "autoPort": true
+    }
+  ]
+}

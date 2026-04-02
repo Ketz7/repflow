@@ -4,6 +4,8 @@ import BottomNav from "@/components/navigation/BottomNav";
 import OnboardingTour from "@/components/OnboardingTour";
 import InstallPrompt from "@/components/InstallPrompt";
 import { WeightUnitProvider } from "@/context/WeightUnitContext";
+import { NotificationProvider } from "@/context/NotificationContext";
+import NotificationBar from "@/components/notifications/NotificationBar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -74,10 +76,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <WeightUnitProvider>
-          <main className="flex-1 pb-20">{children}</main>
-          <BottomNav />
-          <OnboardingTour />
-          <InstallPrompt />
+          <NotificationProvider>
+            <NotificationBar />
+            <main className="flex-1 pb-20 pt-11">{children}</main>
+            <BottomNav />
+            <OnboardingTour />
+            <InstallPrompt />
+          </NotificationProvider>
         </WeightUnitProvider>
       </body>
     </html>

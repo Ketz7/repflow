@@ -192,3 +192,15 @@ export interface UserAgreement {
   accepted_at: string;
   ip_address: string | null;
 }
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: "coach_invite" | "client_request" | "invite_accepted" | "invite_declined";
+  title: string;
+  body: string;
+  link: string;
+  is_read: boolean;
+  coach_client_id: string | null;
+  created_at: string;
+}
