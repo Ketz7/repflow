@@ -42,10 +42,11 @@ export default function SessionPage() {
     sessionId: string;
   } | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [swapExercises, setSwapExercises] = useState<(Exercise & { muscle_group?: { name: string; icon: string } })[]>([]);
+  const [swapSearch, setSwapSearch] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
-  const touchStartX = useRef<number>(0);
-
   useEffect(() => {
     async function load() {
       const supabase = createClient();
@@ -97,21 +98,6 @@ export default function SessionPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const diff = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(diff) > 60) {
-      if (diff < 0 && currentIndex < exercises.length - 1) {
-        setCurrentIndex((p) => p + 1);
-      } else if (diff > 0 && currentIndex > 0) {
-        setCurrentIndex((p) => p - 1);
-      }
-    }
-  };
-
   const updateSet = (exerciseIdx: number, setIdx: number, field: keyof SetEntry, value: number | boolean | null) => {
     setExercises((prev) =>
       prev.map((ex, ei) =>
@@ -146,6 +132,34 @@ export default function SessionPage() {
           : ex
       )
     );
+  };
+
+  const openSwapModal = async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("exercises")
+      .select("*, muscle_group:muscle_groups(name, icon)")
+      .eq("is_approved", true)
+      .order("name");
+    setSwapExercises(data || []);
+    setSwapSearch("");
+    setShowSwapModal(true);
+  };
+
+  const handleSwapExercise = (newExercise: Exercise & { muscle_group?: { name: string; icon: string } }) => {
+    setExercises((prev) =>
+      prev.map((ex, i) =>
+        i === currentIndex
+          ? {
+              ...ex,
+              exercise_id: newExercise.id,
+              exercise: newExercise,
+              sets: ex.sets.map((s) => ({ ...s, completed: false, weight_used: null })),
+            }
+          : ex
+      )
+    );
+    setShowSwapModal(false);
   };
 
   const handleEndSession = useCallback(async () => {
@@ -206,7 +220,7 @@ export default function SessionPage() {
   const totalSetsAll = exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Top Bar */}
       <div className="px-4 pt-4 pb-2 flex items-center justify-between">
         <div>
@@ -260,13 +274,24 @@ export default function SessionPage() {
                 <Badge>{current.exercise.muscle_group?.icon} {current.exercise.muscle_group?.name}</Badge>
                 <span className="text-xs text-subtext">Exercise {currentIndex + 1} of {exercises.length}</span>
               </div>
-              <h2 className="text-xl font-bold text-foreground">{current.exercise.name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-foreground flex-1">{current.exercise.name}</h2>
+                <button
+                  onClick={openSwapModal}
+                  className="p-2 rounded-lg bg-surface border border-border text-subtext hover:text-primary transition-colors"
+                  title="Swap exercise"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                  </svg>
+                </button>
+              </div>
               <p className="text-xs text-subtext mt-1">Target: {current.target_sets} × {current.target_reps}</p>
             </div>
 
             {/* Sets */}
             <div className="space-y-2">
-              <div className="grid grid-cols-[40px_1fr_1fr_48px] gap-2 px-2 text-xs text-subtext">
+              <div className="grid grid-cols-[36px_72px_1fr_44px] gap-2 px-2 text-xs text-subtext">
                 <span>Set</span>
                 <span>Reps</span>
                 <span>Weight ({unitLabel})</span>
@@ -276,7 +301,7 @@ export default function SessionPage() {
                 <motion.div
                   key={si}
                   layout
-                  className={`grid grid-cols-[40px_1fr_1fr_48px] gap-2 items-center p-2 rounded-xl transition-colors ${
+                  className={`grid grid-cols-[36px_72px_1fr_44px] gap-2 items-center p-2 rounded-xl transition-colors ${
                     set.completed ? "bg-success/10 border border-success/20" : "bg-card border border-border"
                   }`}
                 >
@@ -359,6 +384,67 @@ export default function SessionPage() {
               <Button className="flex-1" onClick={handleEndSession}>
                 End & View Stats
               </Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Exercise Swap Modal */}
+      {showSwapModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end">
+          <motion.div
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="w-full max-h-[80vh] bg-surface/90 backdrop-blur-xl border-t border-white/10 rounded-t-3xl flex flex-col"
+          >
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-foreground">Swap Exercise</h3>
+              <button onClick={() => setShowSwapModal(false)} className="text-subtext hover:text-foreground p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-4 pt-3 pb-2">
+              <input
+                type="text"
+                placeholder="Search exercises..."
+                value={swapSearch}
+                onChange={(e) => setSwapSearch(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-card border border-border rounded-xl text-foreground placeholder:text-subtext/50"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 pb-6">
+              {Object.entries(
+                swapExercises
+                  .filter((e) => e.name.toLowerCase().includes(swapSearch.toLowerCase()))
+                  .reduce((groups, ex) => {
+                    const group = ex.muscle_group?.name || "Other";
+                    if (!groups[group]) groups[group] = [];
+                    groups[group].push(ex);
+                    return groups;
+                  }, {} as Record<string, typeof swapExercises>)
+              ).map(([group, exs]) => (
+                <div key={group} className="mb-4">
+                  <p className="text-xs font-medium text-subtext uppercase tracking-wider mb-2">{group}</p>
+                  <div className="space-y-1">
+                    {exs.map((ex) => (
+                      <button
+                        key={ex.id}
+                        onClick={() => handleSwapExercise(ex)}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                          ex.id === current.exercise_id
+                            ? "bg-primary/15 text-primary border border-primary/20"
+                            : "text-foreground hover:bg-card"
+                        }`}
+                      >
+                        {ex.muscle_group?.icon} {ex.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         </div>
