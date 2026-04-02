@@ -50,7 +50,7 @@ create policy "Coach can update own profile"
 create policy "Admins can manage all coach profiles"
   on public.coach_profiles for all
   to authenticated
-  using (exists (select 1 from public.users where id = auth.uid() and is_admin = true));
+  using (exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true));
 
 create index idx_coach_profiles_user on public.coach_profiles(user_id);
 create index idx_coach_profiles_status on public.coach_profiles(status);
@@ -142,7 +142,7 @@ create policy "Client can update own coaching status"
 create policy "Admins can manage all coach clients"
   on public.coach_clients for all
   to authenticated
-  using (exists (select 1 from public.users where id = auth.uid() and is_admin = true));
+  using (exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true));
 
 create index idx_coach_clients_coach on public.coach_clients(coach_id);
 create index idx_coach_clients_client on public.coach_clients(client_id);
@@ -170,7 +170,7 @@ create policy "Coach can manage macro targets for own clients"
     exists (
       select 1 from public.coach_clients cc
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where cc.id = coach_client_id
+      where cc.id = macro_targets.coach_client_id
       and cp.user_id = auth.uid()
       and cc.status = 'active'
     )
@@ -183,7 +183,7 @@ create policy "Client can read own macro targets"
   using (
     exists (
       select 1 from public.coach_clients cc
-      where cc.id = coach_client_id
+      where cc.id = macro_targets.coach_client_id
       and cc.client_id = auth.uid()
     )
   );
@@ -192,7 +192,7 @@ create policy "Client can read own macro targets"
 create policy "Admins can manage all macro targets"
   on public.macro_targets for all
   to authenticated
-  using (exists (select 1 from public.users where id = auth.uid() and is_admin = true));
+  using (exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true));
 
 create index idx_macro_targets_client_date on public.macro_targets(coach_client_id, effective_date desc);
 
@@ -220,7 +220,7 @@ create policy "Coach can manage program assignments for own clients"
     exists (
       select 1 from public.coach_clients cc
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where cc.id = coach_client_id
+      where cc.id = coach_program_assignments.coach_client_id
       and cp.user_id = auth.uid()
     )
   );
@@ -232,7 +232,7 @@ create policy "Client can read own program assignments"
   using (
     exists (
       select 1 from public.coach_clients cc
-      where cc.id = coach_client_id
+      where cc.id = coach_program_assignments.coach_client_id
       and cc.client_id = auth.uid()
     )
   );
@@ -241,7 +241,7 @@ create policy "Client can read own program assignments"
 create policy "Admins can manage all program assignments"
   on public.coach_program_assignments for all
   to authenticated
-  using (exists (select 1 from public.users where id = auth.uid() and is_admin = true));
+  using (exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true));
 
 create index idx_coach_program_assignments_client on public.coach_program_assignments(coach_client_id);
 
@@ -276,7 +276,7 @@ create policy "Coach can read own subscription"
 create policy "Admins can manage all subscriptions"
   on public.coach_subscriptions for all
   to authenticated
-  using (exists (select 1 from public.users where id = auth.uid() and is_admin = true));
+  using (exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true));
 
 -- ============================================
 -- USER AGREEMENTS (ToS and waiver tracking)
@@ -309,7 +309,7 @@ create policy "Users can accept agreements"
 create policy "Admins can read all agreements"
   on public.user_agreements for select
   to authenticated
-  using (exists (select 1 from public.users where id = auth.uid() and is_admin = true));
+  using (exists (select 1 from public.users u where u.id = auth.uid() and u.is_admin = true));
 
 create index idx_user_agreements_user on public.user_agreements(user_id);
 
@@ -325,7 +325,7 @@ create policy "Coach can read client body weight logs"
     exists (
       select 1 from public.coach_clients cc
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where cc.client_id = user_id
+      where cc.client_id = body_weight_logs.user_id
       and cp.user_id = auth.uid()
       and cc.status = 'active'
     )
@@ -339,7 +339,7 @@ create policy "Coach can read client workout sessions"
     exists (
       select 1 from public.coach_clients cc
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where cc.client_id = user_id
+      where cc.client_id = workout_sessions.user_id
       and cp.user_id = auth.uid()
       and cc.status = 'active'
     )
@@ -354,7 +354,7 @@ create policy "Coach can read client session sets"
       select 1 from public.workout_sessions ws
       join public.coach_clients cc on cc.client_id = ws.user_id
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where ws.id = session_id
+      where ws.id = session_sets.session_id
       and cp.user_id = auth.uid()
       and cc.status = 'active'
     )
@@ -368,7 +368,7 @@ create policy "Coach can read client phases"
     exists (
       select 1 from public.coach_clients cc
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where cc.client_id = user_id
+      where cc.client_id = phases.user_id
       and cp.user_id = auth.uid()
       and cc.status = 'active'
     )
@@ -383,7 +383,7 @@ create policy "Coach can read client phase schedules"
       select 1 from public.phases ph
       join public.coach_clients cc on cc.client_id = ph.user_id
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where ph.id = phase_id
+      where ph.id = phase_schedule.phase_id
       and cp.user_id = auth.uid()
       and cc.status = 'active'
     )
@@ -397,7 +397,7 @@ create policy "Coach can read client profiles"
     exists (
       select 1 from public.coach_clients cc
       join public.coach_profiles cp on cp.id = cc.coach_id
-      where cc.client_id = id
+      where cc.client_id = users.id
       and cp.user_id = auth.uid()
       and cc.status = 'active'
     )
@@ -411,7 +411,7 @@ create policy "Client can read coach assigned programs"
     exists (
       select 1 from public.coach_program_assignments cpa
       join public.coach_clients cc on cc.id = cpa.coach_client_id
-      where cpa.program_id = id
+      where cpa.program_id = programs.id
       and cc.client_id = auth.uid()
     )
   );
