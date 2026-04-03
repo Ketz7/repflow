@@ -9,6 +9,10 @@ import WeightChart from "@/components/charts/WeightChart";
 import { formatDuration, formatDate } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useWeightUnit } from "@/context/WeightUnitContext";
+import {
+  ResponsiveContainer, LineChart, Line,
+  XAxis, YAxis, Tooltip, CartesianGrid,
+} from "recharts";
 
 interface PersonalRecord {
   exercise_name: string;
@@ -18,7 +22,7 @@ interface PersonalRecord {
 
 export default function ProgressPage() {
   const { formatWeight, unitLabel } = useWeightUnit();
-  const [tab, setTab] = useState<"weight" | "nutrition" | "history" | "records">("weight");
+  const [tab, setTab] = useState<"body" | "nutrition" | "history" | "records">("body");
   const [weightLogs, setWeightLogs] = useState<BodyWeightLog[]>([]);
   const [sessions, setSessions] = useState<(WorkoutSession & { program_workout?: { name: string } })[]>([]);
   const [records, setRecords] = useState<PersonalRecord[]>([]);
@@ -98,7 +102,7 @@ export default function ProgressPage() {
 
       {/* Tabs */}
       <div className="relative flex gap-1 p-1 bg-surface/80 backdrop-blur-sm border border-white/5 rounded-xl mb-5">
-        {(["weight", "nutrition", "history", "records"] as const).map((t) => (
+        {(["body", "nutrition", "history", "records"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -118,11 +122,13 @@ export default function ProgressPage() {
         ))}
       </div>
 
-      {tab === "weight" && (
-        <div>
+      {tab === "body" && (
+        <div className="space-y-4">
           {weightLogs.length > 0 ? (
             <>
+              {/* Weight chart (existing) */}
               <WeightChart data={weightLogs} />
+
               {/* Trend indicator */}
               {weightLogs.length >= 7 && (() => {
                 const recent = weightLogs.slice(-7);
@@ -131,7 +137,7 @@ export default function ProgressPage() {
                 const diff = last - first;
                 const trend = diff < -0.2 ? "losing" : diff > 0.2 ? "gaining" : "maintaining";
                 return (
-                  <div className={`mt-4 p-3 rounded-xl border ${
+                  <div className={`p-3 rounded-xl border ${
                     trend === "losing" ? "bg-success/10 border-success/20" :
                     trend === "gaining" ? "bg-warning/10 border-warning/20" :
                     "bg-card border-border"
@@ -142,16 +148,60 @@ export default function ProgressPage() {
                        "➡️ Maintaining"}
                     </p>
                     <p className="text-xs text-subtext mt-0.5">
-                      {formatWeight(Math.abs(diff))} {unitLabel} {trend === "losing" ? "lost" : trend === "gaining" ? "gained" : "change"} in the last 7 entries
+                      {formatWeight(Math.abs(diff))} {unitLabel} {trend === "losing" ? "lost" : trend === "gaining" ? "gained" : "change"} in last 7 entries
                     </p>
+                  </div>
+                );
+              })()}
+
+              {/* Fat % chart */}
+              {weightLogs.some((l) => l.fat_percentage != null) && (() => {
+                const compData = weightLogs
+                  .filter((l) => l.fat_percentage != null || l.muscle_percentage != null)
+                  .map((l) => ({
+                    date: new Date(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                    fat: l.fat_percentage ?? null,
+                    muscle: l.muscle_percentage ?? null,
+                  }));
+                const fats = compData.map((d) => d.fat).filter((v): v is number => v != null);
+                const muscles = compData.map((d) => d.muscle).filter((v): v is number => v != null);
+                const allVals = [...fats, ...muscles];
+                const minY = allVals.length ? Math.floor(Math.min(...allVals) - 2) : 0;
+                const maxY = allVals.length ? Math.ceil(Math.max(...allVals) + 2) : 80;
+                return (
+                  <div className="rounded-2xl bg-card border border-border p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Body Composition (%)</h3>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={compData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
+                          <XAxis dataKey="date" tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} />
+                          <YAxis domain={[minY, maxY]} tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} width={30} unit="%" />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "#1A2540", border: "1px solid #1E2D45", borderRadius: "12px", fontSize: "12px", color: "#E2E8F0" }}
+                            formatter={(v: number, name: string) => [`${v}%`, name === "fat" ? "Fat %" : "Muscle %"]}
+                          />
+                          {fats.length > 0 && (
+                            <Line type="monotone" dataKey="fat" stroke="#F87171" strokeWidth={2} dot={{ fill: "#F87171", r: 3 }} activeDot={{ r: 5 }} connectNulls />
+                          )}
+                          {muscles.length > 0 && (
+                            <Line type="monotone" dataKey="muscle" stroke="#34D399" strokeWidth={2} dot={{ fill: "#34D399", r: 3 }} activeDot={{ r: 5 }} connectNulls />
+                          )}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex items-center gap-4 mt-2 justify-center">
+                      {fats.length > 0 && <div className="flex items-center gap-1.5"><div className="w-3 h-0.5 bg-red-400 rounded-full" /><span className="text-xs text-subtext">Fat %</span></div>}
+                      {muscles.length > 0 && <div className="flex items-center gap-1.5"><div className="w-3 h-0.5 bg-success rounded-full" /><span className="text-xs text-subtext">Muscle %</span></div>}
+                    </div>
                   </div>
                 );
               })()}
             </>
           ) : (
             <div className="rounded-2xl bg-card border border-border p-8 text-center">
-              <p className="text-subtext text-sm mb-2">No weight data yet.</p>
-              <p className="text-xs text-subtext/60">Log your weight from the Profile tab.</p>
+              <p className="text-subtext text-sm mb-2">No body data yet.</p>
+              <p className="text-xs text-subtext/60">Log your weight and body composition from the Profile tab.</p>
             </div>
           )}
         </div>
@@ -161,6 +211,38 @@ export default function ProgressPage() {
         <div>
           {weightLogs.some((l) => l.steps || l.protein || l.carbs || l.fat) ? (
             <div className="space-y-3">
+              {/* Steps chart */}
+              {weightLogs.some((l) => l.steps != null) && (() => {
+                const stepsData = weightLogs
+                  .filter((l) => l.steps != null)
+                  .map((l) => ({
+                    date: new Date(l.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+                    steps: l.steps,
+                  }));
+                const allSteps = stepsData.map((d) => d.steps as number);
+                const minY = Math.floor(Math.min(...allSteps) * 0.9 / 1000) * 1000;
+                const maxY = Math.ceil(Math.max(...allSteps) * 1.1 / 1000) * 1000;
+                return (
+                  <div className="rounded-2xl bg-card border border-border p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Daily Steps</h3>
+                    <div className="h-40">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={stepsData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
+                          <XAxis dataKey="date" tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} />
+                          <YAxis domain={[minY, maxY]} tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} width={42} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+                          <Tooltip
+                            contentStyle={{ backgroundColor: "#1A2540", border: "1px solid #1E2D45", borderRadius: "12px", fontSize: "12px", color: "#E2E8F0" }}
+                            formatter={(v: number) => [v.toLocaleString(), "Steps"]}
+                          />
+                          <Line type="monotone" dataKey="steps" stroke="#818CF8" strokeWidth={2} dot={{ fill: "#818CF8", r: 3 }} activeDot={{ r: 5 }} connectNulls />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Recent daily summaries */}
               {[...weightLogs]
                 .filter((l) => l.steps || l.protein || l.carbs || l.fat)

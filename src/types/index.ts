@@ -108,6 +108,8 @@ export interface BodyWeightLog {
   protein: number | null;
   carbs: number | null;
   fat: number | null;
+  fat_percentage: number | null;
+  muscle_percentage: number | null;
   created_at: string;
 }
 

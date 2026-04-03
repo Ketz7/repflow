@@ -19,9 +19,13 @@ export default function ProfilePage() {
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  const [fatPct, setFatPct] = useState("");
+  const [musclePct, setMusclePct] = useState("");
   const [savingLog, setSavingLog] = useState(false);
   const [logSaved, setLogSaved] = useState(false);
   const [todayWeight, setTodayWeight] = useState<number | null>(null);
+  const [todayFatPct, setTodayFatPct] = useState<number | null>(null);
+  const [todayMusclePct, setTodayMusclePct] = useState<number | null>(null);
   const [todayLog, setTodayLog] = useState<{ steps: number | null; protein: number | null; carbs: number | null; fat: number | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [coachProfile, setCoachProfile] = useState<CoachProfile | null>(null);
@@ -48,7 +52,7 @@ export default function ProfilePage() {
       const today = new Date().toISOString().split("T")[0];
       const { data: existingLog } = await supabase
         .from("body_weight_logs")
-        .select("weight, steps, protein, carbs, fat")
+        .select("weight, steps, protein, carbs, fat, fat_percentage, muscle_percentage")
         .eq("user_id", user.id)
         .eq("date", today)
         .single();
@@ -62,6 +66,8 @@ export default function ProfilePage() {
         if (existingLog.protein) setProtein(existingLog.protein.toString());
         if (existingLog.carbs) setCarbs(existingLog.carbs.toString());
         if (existingLog.fat) setFat(existingLog.fat.toString());
+        if (existingLog.fat_percentage) { setTodayFatPct(existingLog.fat_percentage); setFatPct(existingLog.fat_percentage.toString()); }
+        if (existingLog.muscle_percentage) { setTodayMusclePct(existingLog.muscle_percentage); setMusclePct(existingLog.muscle_percentage.toString()); }
         setTodayLog({ steps: existingLog.steps, protein: existingLog.protein, carbs: existingLog.carbs, fat: existingLog.fat });
       }
 
@@ -119,19 +125,23 @@ export default function ProfilePage() {
     const p = parseFloat(protein) || null;
     const c = parseFloat(carbs) || null;
     const f = parseFloat(fat) || null;
+    const fp = parseFloat(fatPct) || null;
+    const mp = parseFloat(musclePct) || null;
 
-    if (!w && !s && !p && !c && !f) return;
+    if (!w && !s && !p && !c && !f && !fp && !mp) return;
 
     setSavingLog(true);
     const supabase = createClient();
     const today = new Date().toISOString().split("T")[0];
 
     await supabase.from("body_weight_logs").upsert(
-      { user_id: profile.id, date: today, weight: w, steps: s, protein: p, carbs: c, fat: f },
+      { user_id: profile.id, date: today, weight: w, steps: s, protein: p, carbs: c, fat: f, fat_percentage: fp, muscle_percentage: mp },
       { onConflict: "user_id,date" }
     );
 
     if (w) setTodayWeight(w);
+    if (fp) setTodayFatPct(fp);
+    if (mp) setTodayMusclePct(mp);
     setTodayLog({ steps: s, protein: p, carbs: c, fat: f });
     setLogSaved(true);
     setSavingLog(false);
@@ -249,6 +259,43 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Body Composition */}
+        <div className="mb-4">
+          <label className="text-xs text-subtext mb-1.5 block">Body Composition (optional)</label>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[10px] text-error/80 mb-1 block text-center">
+                Fat %{todayFatPct ? <span className="text-primary ml-1">({todayFatPct}%)</span> : null}
+              </label>
+              <Input
+                type="number"
+                value={fatPct}
+                onChange={(e) => setFatPct(e.target.value)}
+                placeholder="e.g., 18"
+                className="text-center"
+                min={1}
+                max={60}
+                step={0.1}
+              />
+            </div>
+            <div>
+              <label className="text-[10px] text-success/80 mb-1 block text-center">
+                Muscle %{todayMusclePct ? <span className="text-primary ml-1">({todayMusclePct}%)</span> : null}
+              </label>
+              <Input
+                type="number"
+                value={musclePct}
+                onChange={(e) => setMusclePct(e.target.value)}
+                placeholder="e.g., 42"
+                className="text-center"
+                min={1}
+                max={80}
+                step={0.1}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Steps */}
         <div className="mb-4">
           <label className="text-xs text-subtext mb-1.5 block">
@@ -360,7 +407,7 @@ export default function ProfilePage() {
         <Button
           size="md"
           className="w-full"
-          disabled={(!weight && !steps && !protein && !carbs && !fat) || savingLog}
+          disabled={(!weight && !steps && !protein && !carbs && !fat && !fatPct && !musclePct) || savingLog}
           onClick={handleLogDaily}
         >
           {savingLog ? "Saving..." : logSaved ? "✓ Saved!" : "Save Daily Log"}

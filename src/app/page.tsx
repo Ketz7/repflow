@@ -4,8 +4,24 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useWeightUnit } from "@/context/WeightUnitContext";
+
+interface TodayStats {
+  weight: number | null;
+  fatPct: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+}
+
+interface MacroTargets {
+  protein: number;
+  carbs: number;
+  fat: number;
+}
 
 export default function HomePage() {
+  const { formatWeight, unitLabel } = useWeightUnit();
   const [firstName, setFirstName] = useState("Athlete");
   const [todayWorkout, setTodayWorkout] = useState<{ name: string; workoutId: string; date: string } | null>(null);
   const [activePhase, setActivePhase] = useState<{ name: string } | null>(null);
@@ -14,6 +30,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [isCoach, setIsCoach] = useState(false);
   const [showCoachView, setShowCoachView] = useState(false);
+  const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
+  const [macroTargets, setMacroTargets] = useState<MacroTargets | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -90,6 +108,45 @@ export default function HomePage() {
         }
       }
       setStreak(s);
+
+      // Today's body stats
+      const today = new Date().toISOString().split("T")[0];
+      const { data: todayLog } = await supabase
+        .from("body_weight_logs")
+        .select("weight, fat_percentage, protein, carbs, fat")
+        .eq("user_id", user.id)
+        .eq("date", today)
+        .single();
+
+      if (todayLog) {
+        setTodayStats({
+          weight: todayLog.weight,
+          fatPct: todayLog.fat_percentage,
+          protein: todayLog.protein,
+          carbs: todayLog.carbs,
+          fat: todayLog.fat,
+        });
+
+        // Fetch macro targets from active coach-client relationship
+        const { data: ccRow } = await supabase
+          .from("coach_clients")
+          .select("id")
+          .eq("client_id", user.id)
+          .eq("status", "active")
+          .single();
+
+        if (ccRow) {
+          const { data: mt } = await supabase
+            .from("macro_targets")
+            .select("protein, carbs, fat")
+            .eq("coach_client_id", ccRow.id)
+            .order("effective_date", { ascending: false })
+            .limit(1)
+            .single();
+          if (mt) setMacroTargets({ protein: mt.protein, carbs: mt.carbs, fat: mt.fat });
+        }
+      }
+
       setLoading(false);
     }
     load();
@@ -254,7 +311,79 @@ export default function HomePage() {
           </p>
           <p className="text-subtext text-xs">days</p>
         </motion.div>
-      </div></>)}
+      </div>
+
+      {/* Today's Stats Row */}
+      {todayStats && (todayStats.weight != null || todayStats.fatPct != null || todayStats.protein != null) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="mt-3"
+        >
+          <Link href="/profile">
+            <div className="rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg p-3">
+              <p className="text-xs text-subtext mb-2 font-medium">Today&apos;s Stats</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                {todayStats.weight != null && (
+                  <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-lg px-2.5 py-1.5">
+                    <span className="text-xs text-subtext">⚖️</span>
+                    <span className="text-xs font-semibold text-primary">{formatWeight(todayStats.weight)} {unitLabel}</span>
+                  </div>
+                )}
+                {todayStats.fatPct != null && (
+                  <div className="flex items-center gap-1.5 bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-1.5">
+                    <span className="text-xs text-subtext">🔴</span>
+                    <span className="text-xs font-semibold text-red-400">{todayStats.fatPct}% fat</span>
+                  </div>
+                )}
+                {todayStats.protein != null && (
+                  <div className="flex items-center gap-1.5 bg-success/10 border border-success/20 rounded-lg px-2.5 py-1.5">
+                    <span className="text-xs font-semibold text-success">{todayStats.protein}g P</span>
+                  </div>
+                )}
+                {todayStats.carbs != null && (
+                  <div className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 rounded-lg px-2.5 py-1.5">
+                    <span className="text-xs font-semibold text-accent">{todayStats.carbs}g C</span>
+                  </div>
+                )}
+                {todayStats.fat != null && (
+                  <div className="flex items-center gap-1.5 bg-warning/10 border border-warning/20 rounded-lg px-2.5 py-1.5">
+                    <span className="text-xs font-semibold text-warning">{todayStats.fat}g F</span>
+                  </div>
+                )}
+              </div>
+              {/* Macro progress bars vs targets */}
+              {macroTargets && todayStats.protein != null && (
+                <div className="mt-3 space-y-1.5">
+                  {(["protein", "carbs", "fat"] as const).map((macro) => {
+                    const logged = (todayStats[macro] ?? 0) as number;
+                    const target = macroTargets[macro];
+                    const pct = Math.min((logged / target) * 100, 100);
+                    const colors = { protein: "bg-success", carbs: "bg-accent", fat: "bg-warning" };
+                    const labels = { protein: "Protein", carbs: "Carbs", fat: "Fat" };
+                    return (
+                      <div key={macro}>
+                        <div className="flex justify-between mb-0.5">
+                          <span className="text-[10px] text-subtext">{labels[macro]}</span>
+                          <span className="text-[10px] text-subtext">{logged}g / {target}g</span>
+                        </div>
+                        <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${colors[macro]} rounded-full transition-all`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </Link>
+        </motion.div>
+      )}
+      </>)}
     </div>
   );
 }
