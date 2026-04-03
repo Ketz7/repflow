@@ -179,7 +179,7 @@ export default function ProgressPage() {
                           <YAxis domain={[minY, maxY]} tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} width={30} unit="%" />
                           <Tooltip
                             contentStyle={{ backgroundColor: "#1A2540", border: "1px solid #1E2D45", borderRadius: "12px", fontSize: "12px", color: "#E2E8F0" }}
-                            formatter={(v: number, name: string) => [`${v}%`, name === "fat" ? "Fat %" : "Muscle %"]}
+                            formatter={(v, name) => [`${v ?? ""}%`, name === "fat" ? "Fat %" : "Muscle %"]}
                           />
                           {fats.length > 0 && (
                             <Line type="monotone" dataKey="fat" stroke="#F87171" strokeWidth={2} dot={{ fill: "#F87171", r: 3 }} activeDot={{ r: 5 }} connectNulls />
@@ -230,10 +230,10 @@ export default function ProgressPage() {
                         <LineChart data={stepsData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" />
                           <XAxis dataKey="date" tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} />
-                          <YAxis domain={[minY, maxY]} tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} width={42} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+                          <YAxis domain={[minY, maxY]} tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} width={42} tickFormatter={(v) => `${(Number(v) / 1000).toFixed(0)}k`} />
                           <Tooltip
                             contentStyle={{ backgroundColor: "#1A2540", border: "1px solid #1E2D45", borderRadius: "12px", fontSize: "12px", color: "#E2E8F0" }}
-                            formatter={(v: number) => [v.toLocaleString(), "Steps"]}
+                            formatter={(v) => [Number(v).toLocaleString(), "Steps"]}
                           />
                           <Line type="monotone" dataKey="steps" stroke="#818CF8" strokeWidth={2} dot={{ fill: "#818CF8", r: 3 }} activeDot={{ r: 5 }} connectNulls />
                         </LineChart>
