@@ -31,7 +31,8 @@ interface ExerciseState {
 export default function SessionPage() {
   const params = useParams();
   const router = useRouter();
-  const { unitLabel } = useWeightUnit();
+  const { unit, setUnit, unitLabel } = useWeightUnit();
+  const KG_TO_LBS = 2.20462;
   const [exercises, setExercises] = useState<ExerciseState[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -344,7 +345,15 @@ export default function SessionPage() {
               <div className="grid grid-cols-[32px_1fr_1fr_44px] gap-2 px-2 text-xs text-subtext mb-1 shrink-0">
                 <span className="text-center">Set</span>
                 <span className="text-center">Reps</span>
-                <span className="text-center">Weight ({unitLabel})</span>
+                <span className="text-center flex items-center justify-center gap-1">
+                  Weight
+                  <button
+                    onClick={() => setUnit(unit === "kg" ? "lbs" : "kg")}
+                    className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-primary/15 border border-primary/30 text-primary text-[10px] font-semibold leading-none hover:bg-primary/25 transition-colors"
+                  >
+                    {unitLabel}
+                  </button>
+                </span>
                 <span className="text-center">Done</span>
               </div>
               <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pb-1">
@@ -366,12 +375,22 @@ export default function SessionPage() {
                     />
                     <input
                       type="number"
-                      value={set.weight_used ?? ""}
-                      onChange={(e) => updateSet(currentIndex, si, "weight_used", e.target.value ? parseFloat(e.target.value) : null)}
+                      value={
+                        set.weight_used === null
+                          ? ""
+                          : unit === "lbs"
+                          ? parseFloat((set.weight_used * KG_TO_LBS).toFixed(1))
+                          : set.weight_used
+                      }
+                      onChange={(e) => {
+                        const raw = e.target.value ? parseFloat(e.target.value) : null;
+                        const kg = raw === null ? null : unit === "lbs" ? raw / KG_TO_LBS : raw;
+                        updateSet(currentIndex, si, "weight_used", kg);
+                      }}
                       placeholder="—"
                       className="w-full px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground placeholder:text-subtext/30"
                       min={0}
-                      step={0.5}
+                      step={unit === "lbs" ? 1 : 0.5}
                     />
                     <motion.button
                       onClick={() => updateSet(currentIndex, si, "completed", !set.completed)}
