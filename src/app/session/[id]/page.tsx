@@ -47,7 +47,9 @@ export default function SessionPage() {
   const [swapExercises, setSwapExercises] = useState<(Exercise & { muscle_group?: { name: string; icon: string } })[]>([]);
   const [alternativeExercises, setAlternativeExercises] = useState<(Exercise & { muscle_group?: { name: string; icon: string } })[]>([]);
   const [swapSearch, setSwapSearch] = useState("");
+  const [restTimer, setRestTimer] = useState<{ active: boolean; seconds: number }>({ active: false, seconds: 120 });
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   useEffect(() => {
     async function load() {
@@ -101,7 +103,28 @@ export default function SessionPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
+  useEffect(() => {
+    if (restTimer.active) {
+      restTimerRef.current = setInterval(() => {
+        setRestTimer((prev) => {
+          if (prev.seconds <= 1) {
+            clearInterval(restTimerRef.current!);
+            return { active: false, seconds: 120 };
+          }
+          return { ...prev, seconds: prev.seconds - 1 };
+        });
+      }, 1000);
+    } else {
+      if (restTimerRef.current) clearInterval(restTimerRef.current);
+    }
+    return () => { if (restTimerRef.current) clearInterval(restTimerRef.current); };
+  }, [restTimer.active]);
+
   const updateSet = (exerciseIdx: number, setIdx: number, field: keyof SetEntry, value: number | boolean | null) => {
+    // Trigger rest timer only when marking a set as done (false → true)
+    if (field === "completed" && value === true) {
+      setRestTimer({ active: true, seconds: 120 });
+    }
     setExercises((prev) =>
       prev.map((ex, ei) =>
         ei === exerciseIdx
@@ -132,6 +155,16 @@ export default function SessionPage() {
                 },
               ],
             }
+          : ex
+      )
+    );
+  };
+
+  const removeSet = (exerciseIdx: number) => {
+    setExercises((prev) =>
+      prev.map((ex, ei) =>
+        ei === exerciseIdx && ex.sets.length > 1
+          ? { ...ex, sets: ex.sets.slice(0, -1) }
           : ex
       )
     );
@@ -236,9 +269,9 @@ export default function SessionPage() {
   const totalSetsAll = exercises.reduce((sum, ex) => sum + ex.sets.length, 0);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-dvh bg-background flex flex-col overflow-hidden">
       {/* Top Bar */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
         <div>
           <p className="text-xs text-subtext">Session Timer</p>
           <p className="text-xl font-mono font-bold text-primary">{formatDuration(elapsed)}</p>
@@ -255,7 +288,7 @@ export default function SessionPage() {
       </div>
 
       {/* Exercise Indicators */}
-      <div className="flex gap-1.5 px-4 mb-3">
+      <div className="flex gap-1.5 px-4 mb-3 shrink-0">
         {exercises.map((_, i) => (
           <button
             key={i}
@@ -267,8 +300,8 @@ export default function SessionPage() {
         ))}
       </div>
 
-      {/* Exercise Content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      {/* Exercise Content — fills remaining space, no outer scroll */}
+      <div className="flex-1 min-h-0 px-4">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -276,16 +309,17 @@ export default function SessionPage() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.2 }}
+            className="h-full flex flex-col min-h-0"
           >
             {/* Video */}
             {current.exercise.youtube_url && (
-              <div className="mb-4">
+              <div className="mb-3 shrink-0">
                 <YouTubeEmbed url={current.exercise.youtube_url} />
               </div>
             )}
 
             {/* Exercise Info */}
-            <div className="mb-4">
+            <div className="mb-3 shrink-0">
               <div className="flex items-center gap-2 mb-1">
                 <Badge>{current.exercise.muscle_group?.icon} {current.exercise.muscle_group?.name}</Badge>
                 <span className="text-xs text-subtext">Exercise {currentIndex + 1} of {exercises.length}</span>
@@ -305,65 +339,75 @@ export default function SessionPage() {
               <p className="text-xs text-subtext mt-1">Target: {current.target_sets} × {current.target_reps}</p>
             </div>
 
-            {/* Sets */}
-            <div className="space-y-2">
-              <div className="grid grid-cols-[36px_72px_1fr_44px] gap-2 px-2 text-xs text-subtext">
-                <span>Set</span>
-                <span>Reps</span>
-                <span>Weight ({unitLabel})</span>
+            {/* Sets — header fixed, rows scroll if overflow */}
+            <div className="flex flex-col min-h-0 flex-1">
+              <div className="grid grid-cols-[32px_1fr_1fr_44px] gap-2 px-2 text-xs text-subtext mb-1 shrink-0">
+                <span className="text-center">Set</span>
+                <span className="text-center">Reps</span>
+                <span className="text-center">Weight ({unitLabel})</span>
                 <span className="text-center">Done</span>
               </div>
-              {current.sets.map((set, si) => (
-                <motion.div
-                  key={si}
-                  layout
-                  className={`grid grid-cols-[36px_72px_1fr_44px] gap-2 items-center p-2 rounded-xl transition-colors ${
-                    set.completed ? "bg-success/10 border border-success/20" : "bg-card border border-border"
-                  }`}
-                >
-                  <span className="text-sm font-medium text-subtext text-center">{set.set_number}</span>
-                  <input
-                    type="number"
-                    value={set.reps_completed}
-                    onChange={(e) => updateSet(currentIndex, si, "reps_completed", parseInt(e.target.value) || 0)}
-                    className="px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground"
-                    min={0}
-                  />
-                  <input
-                    type="number"
-                    value={set.weight_used ?? ""}
-                    onChange={(e) => updateSet(currentIndex, si, "weight_used", e.target.value ? parseFloat(e.target.value) : null)}
-                    placeholder="—"
-                    className="px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground placeholder:text-subtext/30"
-                    min={0}
-                    step={0.5}
-                  />
-                  <motion.button
-                    onClick={() => updateSet(currentIndex, si, "completed", !set.completed)}
-                    whileTap={{ scale: 0.85 }}
-                    animate={set.completed ? { scale: [1, 1.2, 1] } : {}}
-                    transition={{ type: "spring", stiffness: 500, damping: 15 }}
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto transition-all ${
-                      set.completed
-                        ? "bg-success text-background shadow-[0_0_12px_rgba(52,211,153,0.4)]"
-                        : "bg-surface border border-border text-subtext"
+              <div className="flex-1 overflow-y-auto min-h-0 space-y-2 pb-1">
+                {current.sets.map((set, si) => (
+                  <motion.div
+                    key={si}
+                    layout
+                    className={`grid grid-cols-[32px_1fr_1fr_44px] gap-2 items-center px-2 py-2 rounded-xl transition-colors ${
+                      set.completed ? "bg-success/10 border border-success/20" : "bg-card border border-border"
                     }`}
                   >
-                    {set.completed ? "✓" : ""}
-                  </motion.button>
-                </motion.div>
-              ))}
+                    <span className="text-sm font-medium text-subtext text-center">{set.set_number}</span>
+                    <input
+                      type="number"
+                      value={set.reps_completed}
+                      onChange={(e) => updateSet(currentIndex, si, "reps_completed", parseInt(e.target.value) || 0)}
+                      className="w-full px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground"
+                      min={0}
+                    />
+                    <input
+                      type="number"
+                      value={set.weight_used ?? ""}
+                      onChange={(e) => updateSet(currentIndex, si, "weight_used", e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="—"
+                      className="w-full px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground placeholder:text-subtext/30"
+                      min={0}
+                      step={0.5}
+                    />
+                    <motion.button
+                      onClick={() => updateSet(currentIndex, si, "completed", !set.completed)}
+                      whileTap={{ scale: 0.85 }}
+                      animate={set.completed ? { scale: [1, 1.2, 1] } : {}}
+                      transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto transition-all ${
+                        set.completed
+                          ? "bg-success text-background shadow-[0_0_12px_rgba(52,211,153,0.4)]"
+                          : "bg-surface border border-border text-subtext"
+                      }`}
+                    >
+                      {set.completed ? "✓" : ""}
+                    </motion.button>
+                  </motion.div>
+                ))}
+              </div>
             </div>
 
-            <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => addSet(currentIndex)}>
-              + Add Set
-            </Button>
+            {/* Add / Remove Set */}
+            <div className="flex gap-2 mt-2 shrink-0">
+              {current.sets.length > 1 && (
+                <Button variant="ghost" size="sm" className="flex-1" onClick={() => removeSet(currentIndex)}>
+                  − Remove Set
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" className="flex-1" onClick={() => addSet(currentIndex)}>
+                + Add Set
+              </Button>
+            </div>
           </motion.div>
         </AnimatePresence>
       </div>
 
       {/* Bottom Actions */}
-      <div className="px-4 pb-6 pt-2 flex gap-3 safe-bottom">
+      <div className="px-4 pb-6 pt-2 flex gap-3 safe-bottom shrink-0">
         {currentIndex > 0 && (
           <Button variant="secondary" onClick={() => setCurrentIndex((p) => p - 1)} className="flex-1">
             ← Prev
@@ -404,6 +448,49 @@ export default function SessionPage() {
           </motion.div>
         </div>
       )}
+
+      {/* Rest Timer Popup */}
+      <AnimatePresence>
+        {restTimer.active && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            className="fixed bottom-24 right-4 z-40 bg-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex flex-col items-center gap-2 w-36"
+          >
+            <p className="text-[10px] font-medium text-subtext uppercase tracking-wider">Rest</p>
+            {/* Circular countdown ring */}
+            <div className="relative w-16 h-16 flex items-center justify-center">
+              <svg className="absolute inset-0 -rotate-90" width="64" height="64" viewBox="0 0 64 64">
+                <circle cx="32" cy="32" r="27" fill="none" stroke="currentColor" strokeWidth="3" className="text-border" />
+                <circle
+                  cx="32" cy="32" r="27" fill="none" stroke="currentColor" strokeWidth="3"
+                  className="text-primary transition-all duration-1000 ease-linear"
+                  strokeLinecap="round"
+                  strokeDasharray={`${2 * Math.PI * 27}`}
+                  strokeDashoffset={`${2 * Math.PI * 27 * (1 - restTimer.seconds / 120)}`}
+                />
+              </svg>
+              <span className="text-lg font-mono font-bold text-foreground">{restTimer.seconds}s</span>
+            </div>
+            <div className="flex gap-1.5 w-full">
+              <button
+                onClick={() => setRestTimer((p) => ({ ...p, seconds: p.seconds + 30 }))}
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-primary/15 text-primary border border-primary/20 hover:bg-primary/25 transition-colors"
+              >
+                +30s
+              </button>
+              <button
+                onClick={() => setRestTimer({ active: false, seconds: 120 })}
+                className="flex-1 text-xs font-medium py-1.5 rounded-lg bg-surface border border-border text-subtext hover:text-foreground transition-colors"
+              >
+                Skip
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Exercise Swap Modal */}
       {showSwapModal && (
