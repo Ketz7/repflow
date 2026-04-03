@@ -34,11 +34,10 @@ export default function AgreementModal({ type, onAccepted, onDeclined }: Agreeme
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    await supabase.from("user_agreements").insert({
-      user_id: user.id,
-      document_type: type,
-      document_version: version,
-    });
+    await supabase.from("user_agreements").upsert(
+      { user_id: user.id, document_type: type, document_version: version },
+      { onConflict: "user_id,document_type,document_version", ignoreDuplicates: true }
+    );
 
     setAccepting(false);
     onAccepted();
