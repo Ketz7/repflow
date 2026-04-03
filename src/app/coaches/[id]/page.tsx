@@ -17,6 +17,7 @@ export default function CoachProfilePage() {
   const [showWaiver, setShowWaiver] = useState(false);
   const [existingRelationship, setExistingRelationship] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -55,15 +56,26 @@ export default function CoachProfilePage() {
   const handleWaiverAccepted = async () => {
     setShowWaiver(false);
     setRequesting(true);
+    setRequestError(null);
 
     const supabase = createClient();
-    await supabase.from("coach_clients").insert({
+    const { error } = await supabase.from("coach_clients").insert({
       coach_id: params.id,
       client_id: userId,
       initiated_by: "client",
     });
 
-    setExistingRelationship("pending");
+    if (error) {
+      // unique_violation — a pending/active relationship already exists
+      if (error.code === "23505") {
+        setExistingRelationship("pending");
+      } else {
+        setRequestError("Could not send request. The coach may not be accepting clients right now.");
+      }
+    } else {
+      setExistingRelationship("pending");
+    }
+
     setRequesting(false);
   };
 
@@ -118,6 +130,11 @@ export default function CoachProfilePage() {
         {/* Action Button */}
         {!isOwnProfile && (
           <>
+            {requestError && (
+              <div className="p-3 mb-3 bg-error/10 border border-error/20 rounded-xl text-center">
+                <span className="text-sm font-medium text-error">{requestError}</span>
+              </div>
+            )}
             {existingRelationship === "active" && (
               <div className="p-3 bg-success/10 border border-success/20 rounded-xl text-center">
                 <span className="text-sm font-medium text-success">Currently your coach</span>
