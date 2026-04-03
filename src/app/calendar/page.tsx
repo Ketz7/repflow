@@ -8,7 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import { motion } from "framer-motion";
-import { formatDateShort, getWeekNumber } from "@/lib/utils";
+import { formatDateShort, getWeekNumber, localToday, toLocalDate } from "@/lib/utils";
 import { PHASE_DURATION_WEEKS } from "@/lib/constants";
 import Link from "next/link";
 
@@ -24,6 +24,7 @@ export default function CalendarPage() {
   const [creating, setCreating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [trainingDays, setTrainingDays] = useState<number[]>([1, 3, 5]); // Default: Mon, Wed, Fri
+  const [completedKeys, setCompletedKeys] = useState<Set<string>>(new Set());
 
   const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -56,6 +57,18 @@ export default function CalendarPage() {
         .eq("phase_id", activePhase.id)
         .order("scheduled_date");
       setSchedule(sched || []);
+
+      // Fetch completed sessions to mark them on the calendar
+      const { data: doneSessions } = await supabase
+        .from("workout_sessions")
+        .select("program_workout_id, started_at")
+        .eq("phase_id", activePhase.id)
+        .not("ended_at", "is", null);
+
+      const keys = new Set<string>(
+        (doneSessions || []).map((s) => `${s.program_workout_id}_${toLocalDate(s.started_at)}`)
+      );
+      setCompletedKeys(keys);
     }
 
     // Load all accessible programs for phase creation
@@ -80,7 +93,7 @@ export default function CalendarPage() {
     return Array.from(weeksMap.entries()).sort((a, b) => a[0] - b[0]);
   }, [phase, schedule]);
 
-  const currentWeek = phase ? getWeekNumber(phase.start_date, new Date().toISOString().split("T")[0]) : 0;
+  const currentWeek = phase ? getWeekNumber(phase.start_date, localToday()) : 0;
 
   const handleCreatePhase = async () => {
     if (!selectedProgramId || !startDate || !phaseName.trim()) return;
@@ -147,7 +160,7 @@ export default function CalendarPage() {
     await loadData();
   };
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localToday();
 
   if (loading) {
     return (
@@ -269,35 +282,44 @@ export default function CalendarPage() {
               {entries.map((entry) => {
                 const isToday = entry.scheduled_date === today;
                 const isPast = entry.scheduled_date < today;
+                const isCompleted = completedKeys.has(`${entry.program_workout_id}_${entry.scheduled_date}`);
                 return (
                   <Link key={entry.id} href={`/session/start?schedule=${entry.id}&workout=${entry.program_workout_id}&date=${entry.scheduled_date}`}>
                     <motion.div
                       whileTap={{ scale: 0.98 }}
                       className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
-                        isToday
+                        isCompleted
+                          ? "bg-success/5 border-success/20 opacity-70"
+                          : isToday
                           ? "bg-primary/10 border-primary/30"
                           : isPast
-                          ? "bg-surface border-border opacity-60"
+                          ? "bg-surface border-border opacity-50"
                           : "bg-card border-border"
                       }`}
                     >
                       <div className="text-center min-w-[44px]">
                         <p className="text-xs text-subtext">{new Date(entry.scheduled_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}</p>
-                        <p className={`text-lg font-bold ${isToday ? "text-primary" : "text-foreground"}`}>
+                        <p className={`text-lg font-bold ${isCompleted ? "text-success" : isToday ? "text-primary" : "text-foreground"}`}>
                           {new Date(entry.scheduled_date + "T12:00:00").getDate()}
                         </p>
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-foreground">
+                        <p className={`text-sm font-medium ${isCompleted ? "text-subtext line-through" : "text-foreground"}`}>
                           {entry.program_workout?.name}
                         </p>
                         <p className="text-xs text-subtext">
                           {formatDateShort(entry.scheduled_date + "T12:00:00")}
                         </p>
                       </div>
-                      {isToday && (
+                      {isCompleted ? (
+                        <div className="w-6 h-6 rounded-full bg-success/20 flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-success">
+                            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      ) : isToday ? (
                         <Badge variant="primary">Today</Badge>
-                      )}
+                      ) : null}
                     </motion.div>
                   </Link>
                 );

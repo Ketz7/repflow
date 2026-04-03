@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import WeightChart from "@/components/charts/WeightChart";
 import { motion } from "framer-motion";
 import { useWeightUnit } from "@/context/WeightUnitContext";
+import { localToday } from "@/lib/utils";
 
 type Tab = "overview" | "macros" | "program" | "activity" | "settings";
 
@@ -61,7 +62,7 @@ export default function ClientDetailPage() {
     setEditNotes(clientData.notes || "");
 
     const clientId = clientData.client_id;
-    const today = new Date().toISOString().split("T")[0];
+    const today = localToday();
 
     // Weight logs (last 30 days)
     const { data: logs } = await supabase
@@ -133,7 +134,7 @@ export default function ClientDetailPage() {
     if (!client || !editProtein || !editCarbs || !editFat) return;
     setSavingMacros(true);
     const supabase = createClient();
-    const today = new Date().toISOString().split("T")[0];
+    const today = localToday();
 
     await supabase.from("macro_targets").insert({
       coach_client_id: client.id,
@@ -151,7 +152,7 @@ export default function ClientDetailPage() {
     if (!client || !selectedProgramId) return;
     setAssigningProgram(true);
     const supabase = createClient();
-    const today = new Date().toISOString().split("T")[0];
+    const today = localToday();
 
     // End current assignment if exists
     if (assignment) {

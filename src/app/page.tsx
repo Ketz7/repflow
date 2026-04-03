@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useWeightUnit } from "@/context/WeightUnitContext";
+import { localToday, toLocalDate } from "@/lib/utils";
 
 interface TodayStats {
   weight: number | null;
@@ -60,7 +61,7 @@ export default function HomePage() {
       const phase = phases?.[0];
       if (phase) {
         setActivePhase({ name: phase.name });
-        const today = new Date().toISOString().split("T")[0];
+        const today = localToday();
         const todayEntry = phase.phase_schedule?.find(
           (s: { scheduled_date: string }) => s.scheduled_date === today
         );
@@ -96,13 +97,13 @@ export default function HomePage() {
       let s = 0;
       if (recentSessions && recentSessions.length > 0) {
         const sessionDates = new Set(
-          recentSessions.map((sess) => new Date(sess.started_at).toISOString().split("T")[0])
+          recentSessions.map((sess) => toLocalDate(sess.started_at))
         );
         const checkDate = new Date();
-        if (!sessionDates.has(checkDate.toISOString().split("T")[0])) {
+        if (!sessionDates.has(toLocalDate(checkDate))) {
           checkDate.setDate(checkDate.getDate() - 1);
         }
-        while (sessionDates.has(checkDate.toISOString().split("T")[0])) {
+        while (sessionDates.has(toLocalDate(checkDate))) {
           s++;
           checkDate.setDate(checkDate.getDate() - 1);
         }
@@ -110,7 +111,7 @@ export default function HomePage() {
       setStreak(s);
 
       // Today's body stats
-      const today = new Date().toISOString().split("T")[0];
+      const today = localToday();
       const { data: todayLog } = await supabase
         .from("body_weight_logs")
         .select("weight, fat_percentage, protein, carbs, fat")

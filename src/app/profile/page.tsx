@@ -10,6 +10,7 @@ import Badge from "@/components/ui/Badge";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useWeightUnit } from "@/context/WeightUnitContext";
+import { localToday } from "@/lib/utils";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -49,7 +50,7 @@ export default function ProfilePage() {
       setProfile(prof);
 
       // Check if weight already logged today
-      const today = new Date().toISOString().split("T")[0];
+      const today = localToday();
       const { data: existingLog } = await supabase
         .from("body_weight_logs")
         .select("weight, steps, protein, carbs, fat, fat_percentage, muscle_percentage")
@@ -132,7 +133,7 @@ export default function ProfilePage() {
 
     setSavingLog(true);
     const supabase = createClient();
-    const today = new Date().toISOString().split("T")[0];
+    const today = localToday();
 
     await supabase.from("body_weight_logs").upsert(
       { user_id: profile.id, date: today, weight: w, steps: s, protein: p, carbs: c, fat: f, fat_percentage: fp, muscle_percentage: mp },
@@ -449,7 +450,7 @@ export default function ProfilePage() {
             <button
               onClick={async () => {
                 const supabase = createClient();
-                await supabase.from("coach_clients").update({ status: "active", started_at: new Date().toISOString().split("T")[0] }).eq("id", pendingCoachInvite.id);
+                await supabase.from("coach_clients").update({ status: "active", started_at: localToday() }).eq("id", pendingCoachInvite.id);
                 setPendingCoachInvite(null);
                 window.location.reload();
               }}

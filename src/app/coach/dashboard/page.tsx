@@ -7,6 +7,7 @@ import type { CoachClient, CoachProfile, MacroTarget, CoachProgramAssignment } f
 import Link from "next/link";
 import Button from "@/components/ui/Button";
 import { motion } from "framer-motion";
+import { localToday } from "@/lib/utils";
 
 interface ClientCardData extends CoachClient {
   todayLog: { protein: number | null; carbs: number | null; fat: number | null; steps: number | null } | null;
@@ -54,7 +55,7 @@ export default function CoachDashboardPage() {
       const pending = (allClients || []).filter((c) => c.status === "pending");
       setPendingRequests(pending);
 
-      const today = new Date().toISOString().split("T")[0];
+      const today = localToday();
 
       // Enrich active clients with today's data
       const enriched: ClientCardData[] = await Promise.all(
@@ -110,7 +111,7 @@ export default function CoachDashboardPage() {
     const supabase = createClient();
     await supabase
       .from("coach_clients")
-      .update({ status: "active", started_at: new Date().toISOString().split("T")[0] })
+      .update({ status: "active", started_at: localToday() })
       .eq("id", clientRelId);
     window.location.reload();
   };

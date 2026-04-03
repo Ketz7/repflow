@@ -41,6 +41,18 @@ export function getWeekNumber(startDate: string, currentDate: string): number {
   return Math.floor(diffDays / 7) + 1;
 }
 
+/** Returns today's date as YYYY-MM-DD in the browser's local timezone (not UTC). */
+export function localToday(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Converts any Date or timestamp string to YYYY-MM-DD in the browser's local timezone. */
+export function toLocalDate(d: Date | string): string {
+  const date = new Date(d);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 export function extractYouTubeId(url: string): string | null {
   const patterns = [
     /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
