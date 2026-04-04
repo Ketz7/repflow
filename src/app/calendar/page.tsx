@@ -39,32 +39,30 @@ export default function CalendarPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: phases } = await supabase
-      .from("phases")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1);
+    // Round-trip 1: fetch phases and programs in parallel
+    const [
+      { data: phases },
+      { data: pub },
+      { data: mine },
+    ] = await Promise.all([
+      supabase.from("phases").select("*").eq("user_id", user.id).eq("is_active", true).order("created_at", { ascending: false }).limit(1),
+      supabase.from("programs").select("*, program_workouts(id, name, day_order)").eq("is_public", true),
+      supabase.from("programs").select("*, program_workouts(id, name, day_order)").eq("user_id", user.id),
+    ]);
+
+    setPrograms([...(pub || []), ...(mine || [])]);
 
     const activePhase = phases?.[0] || null;
     setPhase(activePhase);
 
     if (activePhase) {
-      const { data: sched } = await supabase
-        .from("phase_schedule")
-        .select("*, program_workout:program_workouts(id, name, day_order)")
-        .eq("phase_id", activePhase.id)
-        .order("scheduled_date");
-      setSchedule(sched || []);
+      // Round-trip 2: fetch schedule and completed sessions in parallel
+      const [{ data: sched }, { data: doneSessions }] = await Promise.all([
+        supabase.from("phase_schedule").select("*, program_workout:program_workouts(id, name, day_order)").eq("phase_id", activePhase.id).order("scheduled_date"),
+        supabase.from("workout_sessions").select("phase_schedule_id, program_workout_id, started_at").eq("phase_id", activePhase.id).not("ended_at", "is", null),
+      ]);
 
-      // Fetch completed sessions — match by phase_schedule_id (direct FK) when available,
-      // with a fallback to the legacy program_workout_id + date composite for old sessions.
-      const { data: doneSessions } = await supabase
-        .from("workout_sessions")
-        .select("phase_schedule_id, program_workout_id, started_at")
-        .eq("phase_id", activePhase.id)
-        .not("ended_at", "is", null);
+      setSchedule(sched || []);
 
       const keys = new Set<string>();
       for (const s of doneSessions || []) {
@@ -79,12 +77,6 @@ export default function CalendarPage() {
       setCompletedKeys(keys);
     }
 
-    // Load all accessible programs for phase creation
-    const [{ data: pub }, { data: mine }] = await Promise.all([
-      supabase.from("programs").select("*, program_workouts(id, name, day_order)").eq("is_public", true),
-      supabase.from("programs").select("*, program_workouts(id, name, day_order)").eq("user_id", user.id),
-    ]);
-    setPrograms([...(pub || []), ...(mine || [])]);
     setLoading(false);
   };
 

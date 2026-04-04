@@ -93,38 +93,42 @@ export default function HomePage() {
       setUserId(user.id);
       setFirstName(user.user_metadata?.full_name?.split(" ")[0] || "Athlete");
 
-      // Load profile (includes goal/onboarding state)
-      const { data: profile } = await supabase
-        .from("users")
-        .select("goal, weekly_session_goal, onboarding_completed")
-        .eq("id", user.id)
-        .single();
+      // Fire all independent queries in parallel — 1 round-trip instead of 7
+      const today = localToday();
+      const startOfWeek = new Date();
+      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
 
+      const [
+        { data: profile },
+        { data: coachProfile },
+        { data: phases },
+        { data: recentSessions },
+        { data: todayLog },
+        { data: ccRow },
+      ] = await Promise.all([
+        supabase.from("users").select("goal, weekly_session_goal, onboarding_completed").eq("id", user.id).single(),
+        supabase.from("coach_profiles").select("status").eq("user_id", user.id).single(),
+        supabase.from("phases").select("*, phase_schedule:phase_schedule(*, program_workout:program_workouts(id, name))").eq("user_id", user.id).eq("is_active", true).limit(1),
+        // Fetch enough sessions for both streak and week count
+        supabase.from("workout_sessions").select("started_at").eq("user_id", user.id).not("ended_at", "is", null).order("started_at", { ascending: false }).limit(60),
+        supabase.from("body_weight_logs").select("weight, fat_percentage, protein, carbs, fat").eq("user_id", user.id).eq("date", today).single(),
+        // Fetch coach_client unconditionally — cheap, avoids a conditional waterfall
+        supabase.from("coach_clients").select("id").eq("client_id", user.id).eq("status", "active").single(),
+      ]);
+
+      // Profile
       if (profile) {
         setOnboardingCompleted(profile.onboarding_completed ?? true);
         setWeeklyGoal(profile.weekly_session_goal ?? 3);
       }
 
-      // Check if user is an approved coach
-      const { data: coachProfile } = await supabase
-        .from("coach_profiles")
-        .select("status")
-        .eq("user_id", user.id)
-        .single();
+      // Coach status
       if (coachProfile?.status === "approved") setIsCoach(true);
 
-      // Get active phase
-      const { data: phases } = await supabase
-        .from("phases")
-        .select("*, phase_schedule:phase_schedule(*, program_workout:program_workouts(id, name))")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .limit(1);
-
+      // Active phase + today's workout
       const phase = phases?.[0];
       if (phase) {
         setActivePhase({ name: phase.name });
-        const today = localToday();
         const todayEntry = phase.phase_schedule?.find(
           (s: { scheduled_date: string }) => s.scheduled_date === today
         );
@@ -137,32 +141,15 @@ export default function HomePage() {
         }
       }
 
-      // Week sessions
-      const startOfWeek = new Date();
-      startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
-      const { count } = await supabase
-        .from("workout_sessions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .not("ended_at", "is", null)
-        .gte("started_at", startOfWeek.toISOString());
-      const weekCount = count || 0;
-      setWeekSessions(weekCount);
-
-      // Streak
-      const { data: recentSessions } = await supabase
-        .from("workout_sessions")
-        .select("started_at")
-        .eq("user_id", user.id)
-        .not("ended_at", "is", null)
-        .order("started_at", { ascending: false })
-        .limit(30);
-
+      // Compute week count and streak from a single sessions result
+      const weekStartStr = startOfWeek.toISOString();
+      let weekCount = 0;
       let s = 0;
       if (recentSessions && recentSessions.length > 0) {
         const sessionDates = new Set(
           recentSessions.map((sess) => toLocalDate(sess.started_at))
         );
+        weekCount = recentSessions.filter((sess) => sess.started_at >= weekStartStr).length;
         const checkDate = new Date();
         if (!sessionDates.has(toLocalDate(checkDate))) {
           checkDate.setDate(checkDate.getDate() - 1);
@@ -172,14 +159,14 @@ export default function HomePage() {
           checkDate.setDate(checkDate.getDate() - 1);
         }
       }
+      setWeekSessions(weekCount);
       setStreak(s);
 
-      // Milestone detection — one banner at a time, dismissed via localStorage
+      // Milestones
       const wGoal = profile?.weekly_session_goal ?? 3;
       const dismissed: string[] = JSON.parse(
         typeof window !== "undefined" ? localStorage.getItem("repflow_dismissed_milestones") || "[]" : "[]"
       );
-      // Weekly goal key: reset each week
       const d = new Date();
       const weekStart = new Date(d);
       weekStart.setDate(d.getDate() - d.getDay());
@@ -197,14 +184,6 @@ export default function HomePage() {
       if (active) setMilestone(active);
 
       // Today's body stats
-      const today = localToday();
-      const { data: todayLog } = await supabase
-        .from("body_weight_logs")
-        .select("weight, fat_percentage, protein, carbs, fat")
-        .eq("user_id", user.id)
-        .eq("date", today)
-        .single();
-
       if (todayLog) {
         setTodayStats({
           weight: todayLog.weight,
@@ -214,13 +193,7 @@ export default function HomePage() {
           fat: todayLog.fat,
         });
 
-        const { data: ccRow } = await supabase
-          .from("coach_clients")
-          .select("id")
-          .eq("client_id", user.id)
-          .eq("status", "active")
-          .single();
-
+        // Macro targets — only needs one more round-trip if user has a coach
         if (ccRow) {
           const { data: mt } = await supabase
             .from("macro_targets")

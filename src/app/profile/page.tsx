@@ -44,22 +44,23 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: prof } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+      // Fire all independent queries in parallel — 1 round-trip instead of 5
+      const today = localToday();
+      const [
+        { data: prof },
+        { data: existingLog },
+        { data: coachData },
+        { data: coaching },
+        { data: invite },
+      ] = await Promise.all([
+        supabase.from("users").select("*").eq("id", user.id).single(),
+        supabase.from("body_weight_logs").select("weight, steps, protein, carbs, fat, fat_percentage, muscle_percentage").eq("user_id", user.id).eq("date", today).single(),
+        supabase.from("coach_profiles").select("*").eq("user_id", user.id).single(),
+        supabase.from("coach_clients").select("*, coach_profile:coach_profiles(*, user:users(display_name, avatar_url))").eq("client_id", user.id).eq("status", "active").limit(1).single(),
+        supabase.from("coach_clients").select("*, coach_profile:coach_profiles(*, user:users(display_name, avatar_url))").eq("client_id", user.id).eq("status", "pending").eq("initiated_by", "coach").limit(1).single(),
+      ]);
 
       setProfile(prof);
-
-      // Check if weight already logged today
-      const today = localToday();
-      const { data: existingLog } = await supabase
-        .from("body_weight_logs")
-        .select("weight, steps, protein, carbs, fat, fat_percentage, muscle_percentage")
-        .eq("user_id", user.id)
-        .eq("date", today)
-        .single();
 
       if (existingLog) {
         if (existingLog.weight) {
@@ -75,26 +76,11 @@ export default function ProfilePage() {
         setTodayLog({ steps: existingLog.steps, protein: existingLog.protein, carbs: existingLog.carbs, fat: existingLog.fat });
       }
 
-      // Check if user is a coach
-      const { data: coachData } = await supabase
-        .from("coach_profiles")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
       if (coachData) setCoachProfile(coachData);
 
-      // Check if user has an active coach
-      const { data: coaching } = await supabase
-        .from("coach_clients")
-        .select("*, coach_profile:coach_profiles(*, user:users(display_name, avatar_url))")
-        .eq("client_id", user.id)
-        .eq("status", "active")
-        .limit(1)
-        .single();
       if (coaching) {
         setCoachRelationship(coaching);
-
-        // Load coach's macro targets for this user
+        // Macro targets depend on coaching.id — one more conditional round-trip
         const { data: target } = await supabase
           .from("macro_targets")
           .select("*")
@@ -106,15 +92,6 @@ export default function ProfilePage() {
         if (target) setMacroTarget(target);
       }
 
-      // Check for pending coach invites
-      const { data: invite } = await supabase
-        .from("coach_clients")
-        .select("*, coach_profile:coach_profiles(*, user:users(display_name, avatar_url))")
-        .eq("client_id", user.id)
-        .eq("status", "pending")
-        .eq("initiated_by", "coach")
-        .limit(1)
-        .single();
       if (invite) setPendingCoachInvite(invite);
 
       setLoading(false);
