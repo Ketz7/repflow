@@ -84,6 +84,7 @@ export interface WorkoutSession {
   user_id: string;
   program_workout_id: string | null;
   phase_id: string | null;
+  phase_schedule_id: string | null;
   started_at: string;
   ended_at: string | null;
   notes: string | null;

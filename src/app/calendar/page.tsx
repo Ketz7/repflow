@@ -58,16 +58,24 @@ export default function CalendarPage() {
         .order("scheduled_date");
       setSchedule(sched || []);
 
-      // Fetch completed sessions to mark them on the calendar
+      // Fetch completed sessions — match by phase_schedule_id (direct FK) when available,
+      // with a fallback to the legacy program_workout_id + date composite for old sessions.
       const { data: doneSessions } = await supabase
         .from("workout_sessions")
-        .select("program_workout_id, started_at")
+        .select("phase_schedule_id, program_workout_id, started_at")
         .eq("phase_id", activePhase.id)
         .not("ended_at", "is", null);
 
-      const keys = new Set<string>(
-        (doneSessions || []).map((s) => `${s.program_workout_id}_${toLocalDate(s.started_at)}`)
-      );
+      const keys = new Set<string>();
+      for (const s of doneSessions || []) {
+        if (s.phase_schedule_id) {
+          // Preferred: direct FK reference
+          keys.add(s.phase_schedule_id);
+        } else {
+          // Legacy fallback for sessions created before migration 00020
+          keys.add(`legacy_${s.program_workout_id}_${toLocalDate(s.started_at)}`);
+        }
+      }
       setCompletedKeys(keys);
     }
 
@@ -282,7 +290,10 @@ export default function CalendarPage() {
               {entries.map((entry) => {
                 const isToday = entry.scheduled_date === today;
                 const isPast = entry.scheduled_date < today;
-                const isCompleted = completedKeys.has(`${entry.program_workout_id}_${entry.scheduled_date}`);
+                // Direct match by schedule ID, falling back to legacy key for old sessions
+                const isCompleted =
+                  completedKeys.has(entry.id) ||
+                  completedKeys.has(`legacy_${entry.program_workout_id}_${entry.scheduled_date}`);
                 return (
                   <Link key={entry.id} href={`/session/start?schedule=${entry.id}&workout=${entry.program_workout_id}&date=${entry.scheduled_date}`}>
                     <motion.div

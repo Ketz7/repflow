@@ -20,6 +20,7 @@ function StartSessionInner() {
   useEffect(() => {
     async function startSession() {
       const workoutId = searchParams.get("workout");
+      const scheduleId = searchParams.get("schedule") || null;
       if (!workoutId) { router.push("/calendar"); return; }
 
       const supabase = createClient();
@@ -67,6 +68,7 @@ function StartSessionInner() {
           user_id: user.id,
           program_workout_id: workoutId,
           phase_id: phases?.[0]?.id || null,
+          phase_schedule_id: scheduleId,
           started_at: new Date().toISOString(),
         })
         .select()
