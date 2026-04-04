@@ -11,6 +11,7 @@ import SessionStats from "@/components/workout/SessionStats";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDuration } from "@/lib/utils";
 import { useWeightUnit } from "@/context/WeightUnitContext";
+import { enqueueOfflineSession, drainOfflineQueue, hasPendingOfflineSessions } from "@/lib/offline-queue";
 
 interface SetEntry {
   set_number: number;
@@ -49,6 +50,8 @@ export default function SessionPage() {
   const [alternativeExercises, setAlternativeExercises] = useState<(Exercise & { muscle_group?: { name: string; icon: string } })[]>([]);
   const [swapSearch, setSwapSearch] = useState("");
   const [restTimer, setRestTimer] = useState<{ active: boolean; seconds: number }>({ active: false, seconds: 120 });
+  const [isOffline, setIsOffline] = useState(false);
+  const [savedOffline, setSavedOffline] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
@@ -102,6 +105,27 @@ export default function SessionPage() {
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }, 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  // Offline detection + queue drain on reconnect
+  useEffect(() => {
+    const handleOffline = () => setIsOffline(true);
+    const handleOnline = async () => {
+      setIsOffline(false);
+      const synced = await drainOfflineQueue();
+      if (synced > 0) setSavedOffline(false);
+    };
+    setIsOffline(!navigator.onLine);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    // Drain any leftover queue from previous sessions on mount
+    hasPendingOfflineSessions().then((has) => {
+      if (has && navigator.onLine) drainOfflineQueue();
+    });
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
   }, []);
 
   useEffect(() => {
@@ -213,15 +237,14 @@ export default function SessionPage() {
   };
 
   const handleEndSession = useCallback(async () => {
-    const supabase = createClient();
     const endTime = new Date().toISOString();
+    const sessionId = params.id as string;
 
-    // Save all completed sets
     const allSets = exercises.flatMap((ex) =>
       ex.sets
         .filter((s) => s.completed)
         .map((s) => ({
-          session_id: params.id as string,
+          session_id: sessionId,
           exercise_id: ex.exercise_id,
           set_number: s.set_number,
           reps_completed: s.reps_completed,
@@ -229,23 +252,31 @@ export default function SessionPage() {
         }))
     );
 
+    if (!navigator.onLine) {
+      // Save to IndexedDB and show offline confirmation
+      await enqueueOfflineSession({ sessionId, endedAt: endTime, sets: allSets });
+      // Register background sync so the SW can retry when the device wakes
+      if ("serviceWorker" in navigator && "SyncManager" in window) {
+        const reg = await navigator.serviceWorker.ready;
+        await (reg as ServiceWorkerRegistration & { sync: { register(tag: string): Promise<void> } }).sync
+          .register("repflow-session-sync").catch(() => null);
+      }
+      setSavedOffline(true);
+      if (timerRef.current) clearInterval(timerRef.current);
+      setSessionData({ duration: elapsed, exercises, sessionId });
+      setShowStats(true);
+      setShowEndConfirm(false);
+      return;
+    }
+
+    const supabase = createClient();
     if (allSets.length > 0) {
       await supabase.from("session_sets").insert(allSets);
     }
-
-    // Update session end time
-    await supabase
-      .from("workout_sessions")
-      .update({ ended_at: endTime })
-      .eq("id", params.id);
+    await supabase.from("workout_sessions").update({ ended_at: endTime }).eq("id", sessionId);
 
     if (timerRef.current) clearInterval(timerRef.current);
-
-    setSessionData({
-      duration: elapsed,
-      exercises,
-      sessionId: params.id as string,
-    });
+    setSessionData({ duration: elapsed, exercises, sessionId });
     setShowStats(true);
     setShowEndConfirm(false);
   }, [exercises, elapsed, params.id]);
@@ -271,6 +302,19 @@ export default function SessionPage() {
 
   return (
     <div className="h-dvh bg-background flex flex-col overflow-hidden">
+      {/* Offline banner */}
+      {isOffline && (
+        <div className="bg-warning/15 border-b border-warning/30 px-4 py-1.5 flex items-center gap-2 shrink-0">
+          <div className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+          <p className="text-xs text-warning font-medium">Offline — workout will sync when reconnected</p>
+        </div>
+      )}
+      {savedOffline && (
+        <div className="bg-success/15 border-b border-success/30 px-4 py-1.5 shrink-0">
+          <p className="text-xs text-success font-medium">Saved locally — will sync automatically when online</p>
+        </div>
+      )}
+
       {/* Top Bar */}
       <div className="px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
         <div>

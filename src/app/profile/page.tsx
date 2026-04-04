@@ -11,6 +11,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useWeightUnit } from "@/context/WeightUnitContext";
 import { localToday } from "@/lib/utils";
+import PushNotificationToggle from "@/components/PushNotificationToggle";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -203,9 +204,12 @@ export default function ProfilePage() {
         {profile?.is_admin && <Badge variant="warning">Admin</Badge>}
       </motion.div>
 
-      {/* Weight Unit Toggle */}
+      {/* Notifications + Weight Unit — Settings card */}
       <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-lg p-4 mb-4">
-        <h2 className="text-sm font-semibold text-foreground mb-3">Weight Unit</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-1">Settings</h2>
+        {profile && <PushNotificationToggle userId={profile.id} />}
+        <div className="h-px bg-white/5 my-1" />
+        <h3 className="text-xs text-subtext mt-3 mb-2">Weight Unit</h3>
         <div className="flex gap-2">
           {(["kg", "lbs"] as const).map((u) => (
             <button
