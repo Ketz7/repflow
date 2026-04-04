@@ -18,6 +18,7 @@ interface SetEntry {
   reps_completed: number;
   weight_used: number | null;
   completed: boolean;
+  rpe: number | null;
 }
 
 interface ExerciseState {
@@ -89,6 +90,7 @@ export default function SessionPage() {
               reps_completed: we.target_reps,
               weight_used: null,
               completed: false,
+              rpe: null,
             })),
           }))
         );
@@ -177,6 +179,7 @@ export default function SessionPage() {
                   reps_completed: ex.target_reps,
                   weight_used: ex.sets[ex.sets.length - 1]?.weight_used || null,
                   completed: false,
+                  rpe: null,
                 },
               ],
             }
@@ -249,6 +252,7 @@ export default function SessionPage() {
           set_number: s.set_number,
           reps_completed: s.reps_completed,
           weight_used: s.weight_used,
+          rpe: s.rpe ?? null,
         }))
     );
 
@@ -405,50 +409,82 @@ export default function SessionPage() {
                   <motion.div
                     key={si}
                     layout
-                    className={`grid grid-cols-[32px_1fr_1fr_44px] gap-2 items-center px-2 py-2 rounded-xl transition-colors ${
+                    className={`rounded-xl transition-colors overflow-hidden ${
                       set.completed ? "bg-success/10 border border-success/20" : "bg-card border border-border"
                     }`}
                   >
-                    <span className="text-sm font-medium text-subtext text-center">{set.set_number}</span>
-                    <input
-                      type="number"
-                      value={set.reps_completed}
-                      onChange={(e) => updateSet(currentIndex, si, "reps_completed", parseInt(e.target.value) || 0)}
-                      className="w-full px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground"
-                      min={0}
-                    />
-                    <input
-                      type="number"
-                      value={
-                        set.weight_used === null
-                          ? ""
-                          : unit === "lbs"
-                          ? parseFloat((set.weight_used * KG_TO_LBS).toFixed(1))
-                          : set.weight_used
-                      }
-                      onChange={(e) => {
-                        const raw = e.target.value ? parseFloat(e.target.value) : null;
-                        const kg = raw === null ? null : unit === "lbs" ? raw / KG_TO_LBS : raw;
-                        updateSet(currentIndex, si, "weight_used", kg);
-                      }}
-                      placeholder="—"
-                      className="w-full px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground placeholder:text-subtext/30"
-                      min={0}
-                      step={unit === "lbs" ? 1 : 0.5}
-                    />
-                    <motion.button
-                      onClick={() => updateSet(currentIndex, si, "completed", !set.completed)}
-                      whileTap={{ scale: 0.85 }}
-                      animate={set.completed ? { scale: [1, 1.2, 1] } : {}}
-                      transition={{ type: "spring", stiffness: 500, damping: 15 }}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto transition-all ${
-                        set.completed
-                          ? "bg-success text-background shadow-[0_0_12px_rgba(52,211,153,0.4)]"
-                          : "bg-surface border border-border text-subtext"
-                      }`}
-                    >
-                      {set.completed ? "✓" : ""}
-                    </motion.button>
+                    <div className="grid grid-cols-[32px_1fr_1fr_44px] gap-2 items-center px-2 py-2">
+                      <span className="text-sm font-medium text-subtext text-center">{set.set_number}</span>
+                      <input
+                        type="number"
+                        value={set.reps_completed}
+                        onChange={(e) => updateSet(currentIndex, si, "reps_completed", parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground"
+                        min={0}
+                      />
+                      <input
+                        type="number"
+                        value={
+                          set.weight_used === null
+                            ? ""
+                            : unit === "lbs"
+                            ? parseFloat((set.weight_used * KG_TO_LBS).toFixed(1))
+                            : set.weight_used
+                        }
+                        onChange={(e) => {
+                          const raw = e.target.value ? parseFloat(e.target.value) : null;
+                          const kg = raw === null ? null : unit === "lbs" ? raw / KG_TO_LBS : raw;
+                          updateSet(currentIndex, si, "weight_used", kg);
+                        }}
+                        placeholder="—"
+                        className="w-full px-2 py-2 text-center text-sm bg-surface border border-border rounded-lg text-foreground placeholder:text-subtext/30"
+                        min={0}
+                        step={unit === "lbs" ? 1 : 0.5}
+                      />
+                      <motion.button
+                        onClick={() => updateSet(currentIndex, si, "completed", !set.completed)}
+                        whileTap={{ scale: 0.85 }}
+                        animate={set.completed ? { scale: [1, 1.2, 1] } : {}}
+                        transition={{ type: "spring", stiffness: 500, damping: 15 }}
+                        className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto transition-all ${
+                          set.completed
+                            ? "bg-success text-background shadow-[0_0_12px_rgba(52,211,153,0.4)]"
+                            : "bg-surface border border-border text-subtext"
+                        }`}
+                      >
+                        {set.completed ? "✓" : ""}
+                      </motion.button>
+                    </div>
+                    {/* RPE picker — shown only when set is completed */}
+                    <AnimatePresence>
+                      {set.completed && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="px-2 pb-2 overflow-hidden"
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-subtext shrink-0">RPE</span>
+                            <div className="flex gap-0.5 flex-1">
+                              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                                <button
+                                  key={n}
+                                  onClick={() => updateSet(currentIndex, si, "rpe", set.rpe === n ? null : n)}
+                                  className={`flex-1 py-1 text-[10px] font-bold rounded transition-colors ${
+                                    set.rpe === n
+                                      ? n >= 8 ? "bg-error/80 text-white" : n >= 6 ? "bg-warning/80 text-background" : "bg-success/80 text-background"
+                                      : "bg-surface text-subtext border border-border"
+                                  }`}
+                                >
+                                  {n}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
                 ))}
               </div>

@@ -137,6 +137,7 @@ export interface CoachProfile {
   status: "pending" | "approved" | "suspended";
   max_clients: number;
   monthly_rate: number | null;
+  specialty: string[];
   created_at: string;
   user?: UserProfile;
 }

@@ -90,6 +90,10 @@ body {
   border-radius: 2px;
 }
 
+/* Hide scrollbar while keeping scroll behaviour */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
 /* Prevent pull-to-refresh on mobile */
 html {
   overscroll-behavior: none;

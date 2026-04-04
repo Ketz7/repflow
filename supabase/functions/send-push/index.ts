@@ -1,3 +1,4 @@
+// @ts-nocheck — Deno Edge Function; npm: imports and Deno globals are not in the project's tsconfig
 /**
  * Supabase Edge Function: send-push
  *

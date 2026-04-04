@@ -12,7 +12,9 @@ import { useWeightUnit } from "@/context/WeightUnitContext";
 import {
   ResponsiveContainer, LineChart, Line,
   XAxis, YAxis, Tooltip, CartesianGrid,
+  BarChart, Bar,
 } from "recharts";
+import { toLocalDate } from "@/lib/utils";
 
 interface PersonalRecord {
   exercise_name: string;
@@ -22,10 +24,11 @@ interface PersonalRecord {
 
 export default function ProgressPage() {
   const { formatWeight, unitLabel } = useWeightUnit();
-  const [tab, setTab] = useState<"body" | "nutrition" | "history" | "records">("body");
+  const [tab, setTab] = useState<"body" | "nutrition" | "history" | "records" | "volume">("body");
   const [weightLogs, setWeightLogs] = useState<BodyWeightLog[]>([]);
   const [sessions, setSessions] = useState<(WorkoutSession & { program_workout?: { name: string } })[]>([]);
   const [records, setRecords] = useState<PersonalRecord[]>([]);
+  const [volumeData, setVolumeData] = useState<{ date: string; rawDate: string; tonnage: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,6 +55,39 @@ export default function ProgressPage() {
 
       setWeightLogs(weights || []);
       setSessions(sess || []);
+
+      // Volume: fetch sets for these sessions, compute daily tonnage
+      if (sess && sess.length > 0) {
+        const { data: sets } = await supabase
+          .from("session_sets")
+          .select("session_id, reps_completed, weight_used")
+          .in("session_id", sess.map((s) => s.id))
+          .not("weight_used", "is", null);
+
+        if (sets) {
+          const sessionDateMap = new Map(
+            sess.map((s) => [s.id, toLocalDate(new Date(s.started_at))])
+          );
+          const tonnageByDate = new Map<string, number>();
+          for (const set of sets) {
+            const date = sessionDateMap.get(set.session_id);
+            if (date && set.weight_used) {
+              tonnageByDate.set(date, (tonnageByDate.get(date) || 0) + set.reps_completed * set.weight_used);
+            }
+          }
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 60);
+          const sorted = Array.from(tonnageByDate.entries())
+            .filter(([date]) => new Date(date) >= cutoff)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, tonnage]) => ({
+              rawDate: date,
+              date: new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+              tonnage: Math.round(tonnage),
+            }));
+          setVolumeData(sorted);
+        }
+      }
 
       // If RPC doesn't exist, compute PRs client-side
       if (prs) {
@@ -102,7 +138,7 @@ export default function ProgressPage() {
 
       {/* Tabs */}
       <div className="relative flex gap-1 p-1 bg-surface/80 backdrop-blur-sm border border-white/5 rounded-xl mb-5">
-        {(["body", "nutrition", "history", "records"] as const).map((t) => (
+        {(["body", "nutrition", "history", "records", "volume"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -333,6 +369,104 @@ export default function ProgressPage() {
           )}
         </div>
       )}
+
+      {tab === "volume" && (() => {
+        if (volumeData.length === 0) {
+          return (
+            <div className="rounded-2xl bg-card border border-border p-8 text-center">
+              <p className="text-subtext text-sm mb-2">No volume data yet.</p>
+              <p className="text-xs text-subtext/60">Complete workouts with weights to see tonnage trends.</p>
+            </div>
+          );
+        }
+
+        // Weekly tonnage: this week vs last week
+        const getWeekStart = (d: Date) => { const s = new Date(d); s.setDate(s.getDate() - s.getDay()); s.setHours(0,0,0,0); return s; };
+        const thisWeekStart = getWeekStart(new Date());
+        const lastWeekStart = getWeekStart(new Date(thisWeekStart.getTime() - 7 * 86400000));
+        const thisWeekTonnage = volumeData.filter((d) => new Date(d.rawDate) >= thisWeekStart).reduce((a, d) => a + d.tonnage, 0);
+        const lastWeekTonnage = volumeData.filter((d) => { const dt = new Date(d.rawDate); return dt >= lastWeekStart && dt < thisWeekStart; }).reduce((a, d) => a + d.tonnage, 0);
+        const weekDiff = thisWeekTonnage - lastWeekTonnage;
+        const maxTonnage = Math.max(...volumeData.map((d) => d.tonnage));
+
+        return (
+          <div className="space-y-4">
+            {/* Weekly comparison */}
+            {(thisWeekTonnage > 0 || lastWeekTonnage > 0) && (
+              <div className="rounded-2xl bg-card border border-border p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Weekly Tonnage</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-white/5 p-3 text-center">
+                    <p className="text-xs text-subtext mb-1">This Week</p>
+                    <p className="text-lg font-bold text-primary">{(thisWeekTonnage / 1000).toFixed(1)}t</p>
+                  </div>
+                  <div className="rounded-xl bg-white/5 p-3 text-center">
+                    <p className="text-xs text-subtext mb-1">Last Week</p>
+                    <p className="text-lg font-bold text-foreground">{(lastWeekTonnage / 1000).toFixed(1)}t</p>
+                  </div>
+                </div>
+                {lastWeekTonnage > 0 && (
+                  <div className={`mt-3 flex items-center gap-2 text-xs font-medium ${weekDiff > 0 ? "text-success" : weekDiff < 0 ? "text-error" : "text-subtext"}`}>
+                    <span>{weekDiff > 0 ? "↑" : weekDiff < 0 ? "↓" : "→"}</span>
+                    <span>{weekDiff > 0 ? "+" : ""}{Math.round(weekDiff).toLocaleString()} kg vs last week</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tonnage chart */}
+            <div className="rounded-2xl bg-card border border-border p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Daily Tonnage (kg lifted)</h3>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={volumeData} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1E2D45" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: "#94A3B8", fontSize: 9 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false}
+                      interval={Math.max(0, Math.ceil(volumeData.length / 8) - 1)}
+                    />
+                    <YAxis tick={{ fill: "#94A3B8", fontSize: 10 }} axisLine={{ stroke: "#1E2D45" }} tickLine={false} width={42}
+                      tickFormatter={(v) => v >= 1000 ? `${(Number(v) / 1000).toFixed(0)}t` : String(v)}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: "#1A2540", border: "1px solid #1E2D45", borderRadius: "12px", fontSize: "12px", color: "#E2E8F0" }}
+                      formatter={(v) => [`${Number(v).toLocaleString()} kg`, "Tonnage"]}
+                    />
+                    <Bar dataKey="tonnage" radius={[4, 4, 0, 0]}
+                      fill="url(#tonnageGrad)"
+                    />
+                    <defs>
+                      <linearGradient id="tonnageGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#38BDF8" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#818CF8" stopOpacity={0.7} />
+                      </linearGradient>
+                    </defs>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="text-xs text-subtext/60 mt-2 text-center">Peak: {maxTonnage.toLocaleString()} kg</p>
+            </div>
+
+            {/* Per-session breakdown */}
+            <div className="rounded-2xl bg-card border border-border p-4">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Recent Sessions</h3>
+              <div className="space-y-2">
+                {[...volumeData].reverse().slice(0, 10).map((d) => {
+                  const pct = maxTonnage > 0 ? (d.tonnage / maxTonnage) * 100 : 0;
+                  return (
+                    <div key={d.rawDate} className="flex items-center gap-3">
+                      <span className="text-xs text-subtext w-20 shrink-0">{d.date}</span>
+                      <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-gradient-to-r from-primary to-accent" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-xs text-foreground font-medium w-20 text-right">{d.tonnage.toLocaleString()} kg</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {tab === "records" && (
         <div className="space-y-2">

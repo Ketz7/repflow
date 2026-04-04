@@ -29,7 +29,7 @@ function StartSessionInner() {
       // Check for any open session (ended_at IS NULL) — for ANY workout, not just this one
       const { data: openSessions } = await supabase
         .from("workout_sessions")
-        .select("id, started_at, program_workout:program_workouts(name)")
+        .select("id, started_at, program_workout_id, program_workout:program_workouts(name)")
         .eq("user_id", user.id)
         .is("ended_at", null)
         .order("started_at", { ascending: false })

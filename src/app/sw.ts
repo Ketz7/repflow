@@ -1,3 +1,4 @@
+// @ts-nocheck — service worker runs in WorkerGlobalScope, not DOM; these types are unavailable without webworker lib
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { Serwist } from "serwist";
