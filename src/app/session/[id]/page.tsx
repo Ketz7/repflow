@@ -57,6 +57,12 @@ export default function SessionPage() {
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   useEffect(() => {
+    // Reset synchronously before the async fetch so the timer never shows a
+    // stale value from a previous session (Next.js reuses this component across
+    // /session/[id] navigations — refs survive without an explicit reset).
+    setLoading(true);
+    startTimeRef.current = Date.now();
+
     async function load() {
       const supabase = createClient();
 
