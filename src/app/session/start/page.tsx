@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
@@ -16,10 +16,14 @@ function StartSessionInner() {
   const searchParams = useSearchParams();
   const [inProgress, setInProgress] = useState<InProgressSession | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  // Store resolved user + phase so handleCancel can create the new session
+  // directly without re-entering the effect (router.replace(same URL) is a no-op).
+  const userIdRef   = useRef<string | null>(null);
+  const phaseIdRef  = useRef<string | null>(null);
 
   useEffect(() => {
     async function startSession() {
-      const workoutId = searchParams.get("workout");
+      const workoutId  = searchParams.get("workout");
       const scheduleId = searchParams.get("schedule") || null;
       if (!workoutId) { router.push("/calendar"); return; }
 
@@ -27,7 +31,9 @@ function StartSessionInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
 
-      // Check for any open session (ended_at IS NULL) — for ANY workout, not just this one
+      userIdRef.current = user.id;
+
+      // Check for any open session (ended_at IS NULL)
       const { data: openSessions } = await supabase
         .from("workout_sessions")
         .select("id, started_at, program_workout_id, program_workout:program_workouts(name)")
@@ -39,22 +45,19 @@ function StartSessionInner() {
       const open = openSessions?.[0];
 
       if (open) {
-        // Auto-abandon sessions older than 4 hours — no one is mid-workout after that long.
         const ABANDON_THRESHOLD_MS = 4 * 60 * 60 * 1000;
         const sessionAge = Date.now() - new Date(open.started_at).getTime();
 
         if (sessionAge > ABANDON_THRESHOLD_MS) {
-          // Silently mark as ended and fall through to create a fresh session
           await supabase
             .from("workout_sessions")
             .update({ ended_at: new Date().toISOString() })
             .eq("id", open.id);
+          // fall through to create fresh session
         } else if (open.program_workout_id === workoutId) {
-          // Same workout started recently? Silently resume.
           router.replace(`/session/${open.id}`);
           return;
         } else {
-          // Different workout started recently — ask the user.
           setInProgress({
             id: open.id,
             started_at: open.started_at,
@@ -66,7 +69,7 @@ function StartSessionInner() {
         }
       }
 
-      // No open session — create a fresh one
+      // Resolve active phase id (cache for handleCancel use)
       const { data: phases } = await supabase
         .from("phases")
         .select("id")
@@ -74,12 +77,14 @@ function StartSessionInner() {
         .eq("is_active", true)
         .limit(1);
 
+      phaseIdRef.current = phases?.[0]?.id ?? null;
+
       const { data: session } = await supabase
         .from("workout_sessions")
         .insert({
           user_id: user.id,
           program_workout_id: workoutId,
-          phase_id: phases?.[0]?.id || null,
+          phase_id: phaseIdRef.current,
           phase_schedule_id: scheduleId,
           started_at: new Date().toISOString(),
         })
@@ -103,15 +108,52 @@ function StartSessionInner() {
     if (!inProgress) return;
     setCancelling(true);
     const supabase = createClient();
-    // Mark the old session as ended now so it doesn't linger
+
+    // End the stale session
     await supabase
       .from("workout_sessions")
       .update({ ended_at: new Date().toISOString() })
       .eq("id", inProgress.id);
-    setInProgress(null);
-    setCancelling(false);
-    // Re-run the start flow by refreshing without the in-progress guard
-    router.replace(window.location.pathname + window.location.search);
+
+    // Create the new session directly — do NOT rely on router.replace(same URL)
+    // to re-trigger the effect, as Next.js App Router treats same-URL replaces
+    // as no-ops and the effect will not re-run.
+    const workoutId  = searchParams.get("workout");
+    const scheduleId = searchParams.get("schedule") || null;
+
+    if (!workoutId || !userIdRef.current) {
+      router.push("/calendar");
+      return;
+    }
+
+    // Resolve phase if not yet cached
+    if (!phaseIdRef.current) {
+      const { data: phases } = await supabase
+        .from("phases")
+        .select("id")
+        .eq("user_id", userIdRef.current)
+        .eq("is_active", true)
+        .limit(1);
+      phaseIdRef.current = phases?.[0]?.id ?? null;
+    }
+
+    const { data: session } = await supabase
+      .from("workout_sessions")
+      .insert({
+        user_id: userIdRef.current,
+        program_workout_id: workoutId,
+        phase_id: phaseIdRef.current,
+        phase_schedule_id: scheduleId,
+        started_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (session) {
+      router.replace(`/session/${session.id}`);
+    } else {
+      router.push("/calendar");
+    }
   };
 
   // Show resume/cancel prompt
@@ -158,7 +200,7 @@ function StartSessionInner() {
                 disabled={cancelling}
                 className="w-full py-3 rounded-xl border border-error/30 text-error text-sm font-medium disabled:opacity-50 transition-colors hover:bg-error/5"
               >
-                {cancelling ? "Cancelling..." : "Cancel & Start New"}
+                {cancelling ? "Starting new workout..." : "Cancel & Start New"}
               </button>
             </div>
           </div>
