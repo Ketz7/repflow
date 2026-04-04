@@ -39,19 +39,31 @@ function StartSessionInner() {
       const open = openSessions?.[0];
 
       if (open) {
-        // Same workout? Silently resume. Different workout? Show the prompt.
-        if (open.program_workout_id === workoutId) {
+        // Auto-abandon sessions older than 4 hours — no one is mid-workout after that long.
+        const ABANDON_THRESHOLD_MS = 4 * 60 * 60 * 1000;
+        const sessionAge = Date.now() - new Date(open.started_at).getTime();
+
+        if (sessionAge > ABANDON_THRESHOLD_MS) {
+          // Silently mark as ended and fall through to create a fresh session
+          await supabase
+            .from("workout_sessions")
+            .update({ ended_at: new Date().toISOString() })
+            .eq("id", open.id);
+        } else if (open.program_workout_id === workoutId) {
+          // Same workout started recently? Silently resume.
           router.replace(`/session/${open.id}`);
           return;
+        } else {
+          // Different workout started recently — ask the user.
+          setInProgress({
+            id: open.id,
+            started_at: open.started_at,
+            program_workout: Array.isArray(open.program_workout)
+              ? open.program_workout[0]
+              : open.program_workout,
+          });
+          return;
         }
-        setInProgress({
-          id: open.id,
-          started_at: open.started_at,
-          program_workout: Array.isArray(open.program_workout)
-            ? open.program_workout[0]
-            : open.program_workout,
-        });
-        return;
       }
 
       // No open session — create a fresh one
