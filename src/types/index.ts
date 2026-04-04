@@ -5,6 +5,9 @@ export interface UserProfile {
   avatar_url: string | null;
   is_admin: boolean;
   weight_unit: "kg" | "lbs";
+  goal: "strength" | "hypertrophy" | "fat_loss" | "maintenance" | null;
+  weekly_session_goal: number;
+  onboarding_completed: boolean;
   created_at: string;
 }
 
