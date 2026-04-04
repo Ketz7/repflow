@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useWeightUnit } from "@/context/WeightUnitContext";
 import { localToday } from "@/lib/utils";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
+import DeleteAccountModal from "@/components/DeleteAccountModal";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -35,6 +36,7 @@ export default function ProfilePage() {
   const [macroTarget, setMacroTarget] = useState<MacroTarget | null>(null);
   const [pendingCoachInvite, setPendingCoachInvite] = useState<(CoachClient & { coach_profile?: CoachProfile & { user?: UserProfile } }) | null>(null);
   const { unit, setUnit } = useWeightUnit();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -504,6 +506,27 @@ export default function ProfilePage() {
       <Button variant="danger" className="w-full" onClick={handleSignOut}>
         Sign Out
       </Button>
+
+      {/* Danger Zone */}
+      <div className="rounded-2xl border border-error/20 bg-error/5 p-4">
+        <p className="text-xs font-semibold text-error uppercase tracking-wide mb-1">Danger Zone</p>
+        <p className="text-xs text-subtext mb-3">
+          Permanently delete your account and all personal data. Programs and exercises you created will be kept for the community.
+        </p>
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          className="w-full py-3 rounded-xl border border-error/30 text-error text-sm font-medium hover:bg-error/10 transition-colors"
+        >
+          Delete Account
+        </button>
+      </div>
+
+      {showDeleteModal && (
+        <DeleteAccountModal
+          onClose={() => setShowDeleteModal(false)}
+          onDeleted={() => router.replace("/login")}
+        />
+      )}
     </div>
   );
 }
