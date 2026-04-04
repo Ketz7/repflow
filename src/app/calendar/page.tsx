@@ -295,7 +295,7 @@ export default function CalendarPage() {
                   completedKeys.has(entry.id) ||
                   completedKeys.has(`legacy_${entry.program_workout_id}_${entry.scheduled_date}`);
                 return (
-                  <Link key={entry.id} href={`/session/start?schedule=${entry.id}&workout=${entry.program_workout_id}&date=${entry.scheduled_date}`}>
+                  <Link key={entry.id} href={`/session/preview?schedule=${entry.id}&workout=${entry.program_workout_id}&date=${entry.scheduled_date}`}>
                     <motion.div
                       whileTap={{ scale: 0.98 }}
                       className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
