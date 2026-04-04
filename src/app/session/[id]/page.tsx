@@ -274,10 +274,28 @@ export default function SessionPage() {
     }
 
     const supabase = createClient();
-    if (allSets.length > 0) {
-      await supabase.from("session_sets").insert(allSets);
+
+    // ── ended_at MUST be written first and unconditionally ──────────────────
+    // Sets are secondary data. If their insert fails for any reason (schema
+    // mismatch, RLS, network hiccup), the session is still marked complete and
+    // will not appear as "unfinished" next time the user opens the app.
+    const { error: sessionError } = await supabase
+      .from("workout_sessions")
+      .update({ ended_at: endTime })
+      .eq("id", sessionId);
+
+    if (sessionError) {
+      console.error("[session] failed to write ended_at:", sessionError.message);
+      // Even on failure, clear the UI so the user isn't stuck
     }
-    await supabase.from("workout_sessions").update({ ended_at: endTime }).eq("id", sessionId);
+
+    // Best-effort sets insert — errors are logged but don't block completion
+    if (allSets.length > 0) {
+      const { error: setsError } = await supabase.from("session_sets").insert(allSets);
+      if (setsError) {
+        console.error("[session] sets insert failed (data may be partial):", setsError.message);
+      }
+    }
 
     if (timerRef.current) clearInterval(timerRef.current);
     setSessionData({ duration: elapsed, exercises, sessionId });
