@@ -68,7 +68,7 @@ function GoalRing({
 }
 
 export default function HomePage() {
-  const { formatWeight, unitLabel } = useWeightUnit();
+  const { formatWeight, unitLabel, setUnit } = useWeightUnit();
   const [userId, setUserId] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("Athlete");
   const [onboardingCompleted, setOnboardingCompleted] = useState(true); // optimistic: skip until loaded
@@ -271,9 +271,10 @@ export default function HomePage() {
             onComplete={(goal, wGoal, unit) => {
               setWeeklyGoal(wGoal);
               setOnboardingCompleted(true);
-              // WeightUnitContext is sourced from the DB on next load;
-              // a reload ensures consistency without coupling contexts here.
-              window.location.reload();
+              // Sync weight unit context in-place — no reload needed.
+              // A reload caused a race where the DB write hadn't propagated
+              // yet, making onboarding_completed still false on re-fetch.
+              setUnit(unit);
             }}
           />
         )}

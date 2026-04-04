@@ -25,16 +25,26 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
   const [unit, setUnit] = useState<"kg" | "lbs">("kg");
   const [saving, setSaving] = useState(false);
 
+  const [saveError, setSaveError] = useState<string | null>(null);
+
   const handleFinish = async () => {
     if (!goal) return;
     setSaving(true);
+    setSaveError(null);
     const supabase = createClient();
-    await supabase.from("users").update({
+    const { error } = await supabase.from("users").update({
       goal,
       weekly_session_goal: weeklyGoal,
       weight_unit: unit,
       onboarding_completed: true,
     }).eq("id", userId);
+
+    if (error) {
+      // Don't loop — surface the error so the user can retry
+      setSaveError("Couldn't save your preferences. Please try again.");
+      setSaving(false);
+      return;
+    }
     onComplete(goal, weeklyGoal, unit);
   };
 
@@ -46,7 +56,7 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background flex flex-col"
+      className="fixed inset-0 z-[60] bg-background flex flex-col"
     >
       {/* Progress bar */}
       <div className="h-1 bg-white/10 shrink-0">
@@ -58,7 +68,7 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
         />
       </div>
 
-      <div className="flex-1 flex flex-col px-6 pt-10 pb-8 overflow-y-auto">
+      <div className="flex-1 flex flex-col px-6 pt-10 pb-10 overflow-y-auto" style={{ paddingBottom: "calc(2.5rem + env(safe-area-inset-bottom))" }}>
         {/* Step indicator */}
         <p className="text-xs text-subtext mb-2">Step {step + 1} of {TOTAL_STEPS}</p>
 
@@ -185,6 +195,9 @@ export default function OnboardingWizard({ userId, onComplete }: Props) {
                 ))}
               </div>
 
+              {saveError && (
+                <p className="text-xs text-error text-center mb-3">{saveError}</p>
+              )}
               <div className="flex gap-3 mt-8">
                 <button onClick={() => setStep(1)} className="flex-1 py-4 rounded-2xl border border-white/10 text-subtext text-sm font-medium">
                   Back
