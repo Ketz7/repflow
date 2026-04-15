@@ -78,6 +78,7 @@ export default function HomePage() {
   const [weeklyGoal, setWeeklyGoal] = useState(3);
   const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingStats, setLoadingStats] = useState(true);
   const [isCoach, setIsCoach] = useState(false);
   const [showCoachView, setShowCoachView] = useState(false);
   const [todayStats, setTodayStats] = useState<TodayStats | null>(null);
@@ -85,6 +86,7 @@ export default function HomePage() {
   const [milestone, setMilestone] = useState<Milestone | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -92,6 +94,7 @@ export default function HomePage() {
 
       setUserId(user.id);
       setFirstName(user.user_metadata?.full_name?.split(" ")[0] || "Athlete");
+      setLoading(false); // header is ready — show it now
 
       // Fire all independent queries in parallel — 1 round-trip instead of 7
       const today = localToday();
@@ -194,7 +197,7 @@ export default function HomePage() {
         });
       }
 
-      setLoading(false); // page renders NOW — macros load in background below
+      setLoadingStats(false); // stats sections are ready
 
       // Macro targets — background fetch, does NOT block render
       if (todayLog && ccRow) {
@@ -205,10 +208,11 @@ export default function HomePage() {
           .order("effective_date", { ascending: false })
           .limit(1)
           .single();
-        if (mt) setMacroTargets({ protein: mt.protein, carbs: mt.carbs, fat: mt.fat });
+        if (!cancelled && mt) setMacroTargets({ protein: mt.protein, carbs: mt.carbs, fat: mt.fat });
       }
     }
     load();
+    return () => { cancelled = true; };
   }, []);
 
   const dismissMilestone = () => {
@@ -492,6 +496,7 @@ export default function HomePage() {
                         </div>
                       )}
                     </div>
+                    {/* macroTargets arrives ~1 round-trip after render — progress bars animate in when ready */}
                     {macroTargets && todayStats.protein != null && (
                       <div className="mt-3 space-y-1.5">
                         {(["protein", "carbs", "fat"] as const).map((macro) => {
