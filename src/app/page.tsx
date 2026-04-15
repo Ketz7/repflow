@@ -88,11 +88,19 @@ export default function HomePage() {
     let cancelled = false;
     async function load() {
       const supabase = createClient();
+
+      // Phase 1: read local session cookie (no network) — name available immediately
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setFirstName(session.user.user_metadata?.full_name?.split(" ")[0] || "Athlete");
+      }
+
+      // Phase 2: validate session server-side before hitting the DB
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       setUserId(user.id);
-      setFirstName(user.user_metadata?.full_name?.split(" ")[0] || "Athlete");
+      // firstName is already set from getSession() above — no need to set again here
       // Fire all independent queries in parallel — 1 round-trip instead of 7
       const today = localToday();
       const startOfWeek = new Date();
@@ -115,6 +123,8 @@ export default function HomePage() {
         // Fetch coach_client unconditionally — cheap, avoids a conditional waterfall
         supabase.from("coach_clients").select("id").eq("client_id", user.id).eq("status", "active").single(),
       ]);
+
+      if (cancelled) return; // component may have unmounted during the query batch
 
       // Profile
       if (profile) {
