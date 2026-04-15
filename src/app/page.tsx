@@ -241,7 +241,6 @@ export default function HomePage() {
 
   return (
     <LazyMotion features={domAnimation}>
-      <>
       {/* Onboarding wizard — fullscreen overlay for new users */}
       <AnimatePresence>
         {!onboardingCompleted && userId && (
@@ -544,7 +543,6 @@ export default function HomePage() {
           </>
         )}
       </div>
-      </>
     </LazyMotion>
   );
 }
