@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { LazyMotion, domAnimation, m, AnimatePresence } from "framer-motion";
 import { useWeightUnit } from "@/context/WeightUnitContext";
 import { localToday, toLocalDate } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -50,7 +50,7 @@ function GoalRing({
       <div className="relative w-[72px] h-[72px]">
         <svg className="w-full h-full -rotate-90" viewBox="0 0 72 72">
           <circle cx="36" cy="36" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="5" />
-          <motion.circle
+          <m.circle
             cx="36" cy="36" r={r} fill="none"
             stroke={color} strokeWidth="5" strokeLinecap="round"
             strokeDasharray={circ}
@@ -240,7 +240,8 @@ export default function HomePage() {
   };
 
   return (
-    <>
+    <LazyMotion features={domAnimation}>
+      <>
       {/* Onboarding wizard — fullscreen overlay for new users */}
       <AnimatePresence>
         {!onboardingCompleted && userId && (
@@ -260,7 +261,7 @@ export default function HomePage() {
 
       <div className="px-4 pt-6 pb-6">
         {/* Header — always visible, renders immediately from auth session */}
-        <motion.div
+        <m.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="mb-5"
@@ -269,7 +270,7 @@ export default function HomePage() {
           <h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
             {firstName}
           </h1>
-        </motion.div>
+        </m.div>
 
         {/* Stats sections — skeleton until loadingStats clears */}
         {loadingStats ? (
@@ -285,7 +286,7 @@ export default function HomePage() {
             {/* Milestone banner */}
             <AnimatePresence>
               {milestone && (
-                <motion.div
+                <m.div
                   key={milestone.type}
                   initial={{ opacity: 0, y: -12, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -307,7 +308,7 @@ export default function HomePage() {
                       <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
                     </svg>
                   </button>
-                </motion.div>
+                </m.div>
               )}
             </AnimatePresence>
 
@@ -348,7 +349,7 @@ export default function HomePage() {
             {!showCoachView && (
               <>
                 {/* Today's Workout Card */}
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
@@ -376,12 +377,12 @@ export default function HomePage() {
                         <p className="text-foreground font-medium mb-1">{todayWorkout.name}</p>
                         <p className="text-subtext text-sm mb-4">Ready when you are.</p>
                         <Link href={`/session/start?workout=${todayWorkout.workoutId}&date=${todayWorkout.date}`}>
-                          <motion.button
+                          <m.button
                             whileTap={{ scale: 0.97 }}
                             className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-background font-semibold text-sm shadow-[0_4px_20px_rgba(56,189,248,0.3)]"
                           >
                             Start Workout
-                          </motion.button>
+                          </m.button>
                         </Link>
                       </>
                     ) : activePhase ? (
@@ -392,21 +393,21 @@ export default function HomePage() {
                           Create a phase to get started with your training program.
                         </p>
                         <Link href="/calendar">
-                          <motion.button
+                          <m.button
                             whileTap={{ scale: 0.97 }}
                             className="w-full py-3 rounded-xl bg-gradient-to-r from-primary to-accent text-background font-semibold text-sm shadow-[0_4px_20px_rgba(56,189,248,0.3)]"
                           >
                             Get Started
-                          </motion.button>
+                          </m.button>
                         </Link>
                       </>
                     )}
                   </div>
-                </motion.div>
+                </m.div>
 
                 {/* Quick Stats */}
                 <div className="grid grid-cols-2 gap-3 mb-3">
-                  <motion.div
+                  <m.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
@@ -422,8 +423,8 @@ export default function HomePage() {
                     </div>
                     <p className="text-2xl font-bold text-foreground">{weekSessions}</p>
                     <p className="text-subtext text-xs">sessions</p>
-                  </motion.div>
-                  <motion.div
+                  </m.div>
+                  <m.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
@@ -441,11 +442,11 @@ export default function HomePage() {
                       {streak}
                     </p>
                     <p className="text-subtext text-xs">days</p>
-                  </motion.div>
+                  </m.div>
                 </div>
 
                 {/* Goal Rings */}
-                <motion.div
+                <m.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35 }}
@@ -468,11 +469,11 @@ export default function HomePage() {
                       color={streak >= 7 ? "#F97316" : streak >= 3 ? "#818CF8" : "#64748B"}
                     />
                   </div>
-                </motion.div>
+                </m.div>
 
                 {/* Today's Stats Row */}
                 {todayStats && (todayStats.weight != null || todayStats.fatPct != null || todayStats.protein != null) && (
-                  <motion.div
+                  <m.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.4 }}
@@ -536,13 +537,14 @@ export default function HomePage() {
                         )}
                       </div>
                     </Link>
-                  </motion.div>
+                  </m.div>
                 )}
               </>
             )}
           </>
         )}
       </div>
-    </>
+      </>
+    </LazyMotion>
   );
 }
