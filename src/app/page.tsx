@@ -6,7 +6,12 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWeightUnit } from "@/context/WeightUnitContext";
 import { localToday, toLocalDate } from "@/lib/utils";
-import OnboardingWizard from "@/components/OnboardingWizard";
+import dynamic from "next/dynamic";
+
+const OnboardingWizard = dynamic(
+  () => import("@/components/OnboardingWizard"),
+  { ssr: false, loading: () => null }
+);
 
 interface TodayStats {
   weight: number | null;
