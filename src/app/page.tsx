@@ -35,6 +35,7 @@ interface Milestone {
   color: string;
 }
 
+// Note: uses m.* — must render inside a <LazyMotion> provider
 // Circular SVG progress ring
 function GoalRing({
   value, max, label, sublabel, color,
@@ -94,16 +95,17 @@ export default function HomePage() {
     async function load() {
       const supabase = createClient();
 
-      // Phase 1: read local session cookie (no network) — name available immediately
+      // Phase 1: read local session (reads localStorage, may refresh token if near expiry)
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         setFirstName(session.user.user_metadata?.full_name?.split(" ")[0] || "Athlete");
       }
+      if (cancelled) return; // guard before getUser network call
 
       // Phase 2: validate session server-side before hitting the DB
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        setLoadingStats(false);
+        if (!cancelled) setLoadingStats(false);
         return;
       }
       if (cancelled) return; // guard before any state updates from validated user
