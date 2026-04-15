@@ -192,21 +192,21 @@ export default function HomePage() {
           carbs: todayLog.carbs,
           fat: todayLog.fat,
         });
-
-        // Macro targets — only needs one more round-trip if user has a coach
-        if (ccRow) {
-          const { data: mt } = await supabase
-            .from("macro_targets")
-            .select("protein, carbs, fat")
-            .eq("coach_client_id", ccRow.id)
-            .order("effective_date", { ascending: false })
-            .limit(1)
-            .single();
-          if (mt) setMacroTargets({ protein: mt.protein, carbs: mt.carbs, fat: mt.fat });
-        }
       }
 
-      setLoading(false);
+      setLoading(false); // page renders NOW — macros load in background below
+
+      // Macro targets — background fetch, does NOT block render
+      if (todayLog && ccRow) {
+        const { data: mt } = await supabase
+          .from("macro_targets")
+          .select("protein, carbs, fat")
+          .eq("coach_client_id", ccRow.id)
+          .order("effective_date", { ascending: false })
+          .limit(1)
+          .single();
+        if (mt) setMacroTargets({ protein: mt.protein, carbs: mt.carbs, fat: mt.fat });
+      }
     }
     load();
   }, []);
