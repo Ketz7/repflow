@@ -97,7 +97,11 @@ export default function HomePage() {
 
       // Phase 2: validate session server-side before hitting the DB
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoadingStats(false);
+        return;
+      }
+      if (cancelled) return; // guard before any state updates from validated user
 
       setUserId(user.id);
       // firstName is already set from getSession() above — no need to set again here
