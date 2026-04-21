@@ -572,17 +572,25 @@ export default function SessionPage() {
         </div>
       )}
 
-      {/* Rest Timer Popup */}
+      {/* Rest Timer Popup — draggable, stays within viewport */}
       <AnimatePresence>
         {restTimer.active && (
           <motion.div
+            drag
+            dragMomentum={false}
+            dragElastic={0.15}
+            dragConstraints={{ top: -window.innerHeight + 200, bottom: 0, left: -window.innerWidth + 160, right: 0 }}
             initial={{ opacity: 0, scale: 0.8, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             transition={{ type: "spring", stiffness: 400, damping: 25 }}
-            className="fixed bottom-24 right-4 z-40 bg-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex flex-col items-center gap-2 w-36"
+            whileDrag={{ scale: 1.05, boxShadow: "0 12px 40px rgba(0,0,0,0.6)" }}
+            className="fixed bottom-24 right-4 z-40 bg-surface/90 backdrop-blur-xl border border-white/10 rounded-2xl p-3 shadow-[0_8px_32px_rgba(0,0,0,0.5)] flex flex-col items-center gap-2 w-36 cursor-grab active:cursor-grabbing touch-none"
           >
-            <p className="text-[10px] font-medium text-subtext uppercase tracking-wider">Rest</p>
+            <div className="flex items-center justify-between w-full">
+              <p className="text-[10px] font-medium text-subtext uppercase tracking-wider">Rest</p>
+              <span className="text-subtext/60 text-xs select-none" aria-hidden="true">⋮⋮</span>
+            </div>
             {/* Circular countdown ring */}
             <div className="relative w-16 h-16 flex items-center justify-center">
               <svg className="absolute inset-0 -rotate-90" width="64" height="64" viewBox="0 0 64 64">
