@@ -73,11 +73,14 @@ export default function SessionPage() {
   } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef<number>(Date.now());
+  // Initialized to 0; the mount effect below immediately sets it to Date.now()
+  // before any consumer reads it. This keeps render pure (React Compiler).
+  const startTimeRef = useRef<number>(0);
   useEffect(() => {
     // Reset synchronously before the async fetch so the timer never shows a
     // stale value from a previous session (Next.js reuses this component across
     // /session/[id] navigations — refs survive without an explicit reset).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     startTimeRef.current = Date.now();
 
@@ -207,6 +210,8 @@ export default function SessionPage() {
       const synced = await drainOfflineQueue();
       if (synced > 0) setSavedOffline(false);
     };
+    // Syncing from external browser state (navigator.onLine) on mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsOffline(!navigator.onLine);
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);

@@ -28,6 +28,18 @@ interface WorkoutInfo {
   name: string;
 }
 
+/** Shape returned by the joined `workout_exercises` select. */
+type WorkoutExerciseRow = {
+  exercise_id: string;
+  target_sets: number;
+  target_reps: number;
+  sort_order: number;
+  exercise: {
+    name: string | null;
+    muscle_group: { name: string | null; icon: string | null } | null;
+  } | null;
+};
+
 function WorkoutPreviewInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -69,7 +81,8 @@ function WorkoutPreviewInner() {
           .from("workout_exercises")
           .select("exercise_id, target_sets, target_reps, sort_order, exercise:exercises(name, muscle_group:muscle_groups(name, icon))")
           .eq("program_workout_id", workoutId)
-          .order("sort_order"),
+          .order("sort_order")
+          .returns<WorkoutExerciseRow[]>(),
 
         // Any open session for this user + workout (recent, not timed-out)
         supabase
@@ -97,7 +110,7 @@ function WorkoutPreviewInner() {
 
       if (workoutExercises) {
         setExercises(
-          workoutExercises.map((we: any) => ({
+          workoutExercises.map((we) => ({
             exercise_id: we.exercise_id,
             name: we.exercise?.name || "Unknown",
             muscle_group: we.exercise?.muscle_group?.name || null,
@@ -119,12 +132,9 @@ function WorkoutPreviewInner() {
       setAlreadyDone((doneSessions || []).length > 0);
 
       // Compute readiness from last ~14 days of training
-      type WeRow = {
-        exercise?: { muscle_group?: { name?: string | null } | null } | null;
-      };
       const targetMuscles = Array.from(
         new Set(
-          ((workoutExercises as WeRow[] | null) || [])
+          (workoutExercises || [])
             .map((we) => we.exercise?.muscle_group?.name ?? null)
             .filter((m): m is string => !!m)
         )

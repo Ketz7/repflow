@@ -240,6 +240,8 @@ export function detectPRs(sets: SetLog[], sinceDate: string): PRRecord[] {
     }
   }
   prs.sort((a, b) => b._impPct - a._impPct);
+  // Strip the internal sort key from the public return shape.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return prs.map(({ _impPct, ...rest }) => rest);
 }
 
