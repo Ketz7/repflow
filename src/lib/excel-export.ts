@@ -104,8 +104,8 @@ function toYmd(dateIso: string): string {
 export async function exportUserDataToXlsx(userId: string): Promise<Blob> {
   const supabase = createClient();
 
-  // -- Parallel fetch --------------------------------------------------------
-  const [userRes, sessionsRes, setsRes, bodyLogsRes] = await Promise.all([
+  // -- Parallel fetch (user, sessions, body logs) ----------------------------
+  const [userRes, sessionsRes, bodyLogsRes] = await Promise.all([
     supabase
       .from("users")
       .select("id, email, display_name, goal, weekly_session_goal, weight_unit")
@@ -121,14 +121,6 @@ export async function exportUserDataToXlsx(userId: string): Promise<Blob> {
       .order("started_at", { ascending: false })
       .returns<SessionRow[]>(),
     supabase
-      .from("session_sets")
-      .select(
-        "id, session_id, exercise_id, set_number, reps_completed, weight_used, rpe, created_at, exercise:exercises(name, muscle_group:muscle_groups(name))"
-      )
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .returns<SetRow[]>(),
-    supabase
       .from("body_weight_logs")
       .select(
         "date, weight, steps, protein, carbs, fat, fat_percentage, muscle_percentage"
@@ -140,8 +132,24 @@ export async function exportUserDataToXlsx(userId: string): Promise<Blob> {
 
   const user = userRes.data;
   const sessions = sessionsRes.data ?? [];
-  const sets = setsRes.data ?? [];
   const bodyLogs = bodyLogsRes.data ?? [];
+
+  // -- Sets are scoped via session_id (no user_id column on session_sets) ----
+  // Fetch sets only for the user's own sessions. RLS will also enforce this,
+  // but filtering client-side avoids a 403-shaped empty result on a join-less
+  // policy setup.
+  const sessionIds = sessions.map((s) => s.id);
+  const setsRes = sessionIds.length
+    ? await supabase
+        .from("session_sets")
+        .select(
+          "id, session_id, exercise_id, set_number, reps_completed, weight_used, rpe, created_at, exercise:exercises(name, muscle_group:muscle_groups(name))"
+        )
+        .in("session_id", sessionIds)
+        .order("created_at", { ascending: false })
+        .returns<SetRow[]>()
+    : { data: [] as SetRow[] };
+  const sets = setsRes.data ?? [];
 
   const unit = user?.weight_unit ?? "kg";
   const weightFmt = `0.0 "${unit}"`;
