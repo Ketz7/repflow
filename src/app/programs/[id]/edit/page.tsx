@@ -185,16 +185,22 @@ export default function EditProgramPage() {
     await supabase.from("program_workouts").delete().eq("program_id", params.id as string);
 
     // Re-create all workouts and exercises
+    let allSucceeded = true;
     for (let i = 0; i < workouts.length; i++) {
       const w = workouts[i];
-      const { data: workout } = await supabase
+      const { data: workout, error: workoutErr } = await supabase
         .from("program_workouts")
         .insert({ program_id: params.id as string, name: w.name, day_order: i + 1 })
         .select()
         .single();
 
-      if (workout && w.exercises.length > 0) {
-        await supabase.from("workout_exercises").insert(
+      if (workoutErr || !workout) {
+        allSucceeded = false;
+        continue;
+      }
+
+      if (w.exercises.length > 0) {
+        const { error: exErr } = await supabase.from("workout_exercises").insert(
           w.exercises.map((e, j) => ({
             program_workout_id: workout.id,
             exercise_id: e.exercise_id,
@@ -203,10 +209,13 @@ export default function EditProgramPage() {
             sort_order: j + 1,
           }))
         );
+        if (exErr) allSucceeded = false;
       }
     }
 
-    clearDraft();
+    // Only clear the draft on a fully successful save. On partial failure
+    // the user can retry without losing their in-progress work.
+    if (allSucceeded) clearDraft();
     router.push(`/programs/${params.id}`);
   };
 
