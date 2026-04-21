@@ -54,7 +54,10 @@ export function useProgramDraft({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const indicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Mount read — once per `enabled` becoming true
+  // Mount read — once per `enabled` becoming true.
+  // We can't use a lazy `useState` initializer because `enabled` may start
+  // false (edit page waits for server load) and flip true later. The
+  // setState-in-effect is intentional and fires at most once per key.
   useEffect(() => {
     if (!enabled || hasMountedRef.current) return;
     hasMountedRef.current = true;
@@ -62,6 +65,7 @@ export function useProgramDraft({
     const draft = readDraft(key);
     if (!draft) return;
     if (isDraftMeaningful(draft)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPendingDraft(draft);
     } else {
       clearDraftStorage(key);
