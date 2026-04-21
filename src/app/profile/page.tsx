@@ -13,6 +13,12 @@ import { useWeightUnit } from "@/context/WeightUnitContext";
 import { localToday } from "@/lib/utils";
 import PushNotificationToggle from "@/components/PushNotificationToggle";
 import DeleteAccountModal from "@/components/DeleteAccountModal";
+import dynamic from "next/dynamic";
+
+const ExportDataButton = dynamic(
+  () => import("@/components/profile/ExportDataButton"),
+  { ssr: false }
+);
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -478,6 +484,9 @@ export default function ProfilePage() {
           </Link>
         </div>
       </div>
+
+      {/* Data Export */}
+      {profile && <ExportDataButton userId={profile.id} />}
 
       {/* Sign Out */}
       <Button variant="danger" className="w-full" onClick={handleSignOut}>
