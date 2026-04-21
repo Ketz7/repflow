@@ -12,6 +12,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import { formatDuration } from "@/lib/utils";
 import { useWeightUnit } from "@/context/WeightUnitContext";
 import { enqueueOfflineSession, drainOfflineQueue, hasPendingOfflineSessions } from "@/lib/offline-queue";
+import {
+  autoregulationPrescription,
+  detectPRs,
+  type SetLog,
+  type PRRecord,
+  type AutoregulationResult,
+} from "@/lib/training-analytics";
+import AutoregHint from "@/components/session/AutoregHint";
+import PRCelebrationModal from "@/components/session/PRCelebrationModal";
 
 interface SetEntry {
   set_number: number;
@@ -53,6 +62,15 @@ export default function SessionPage() {
   const [restTimer, setRestTimer] = useState<{ active: boolean; seconds: number }>({ active: false, seconds: 120 });
   const [isOffline, setIsOffline] = useState(false);
   const [savedOffline, setSavedOffline] = useState(false);
+  const [history, setHistory] = useState<SetLog[]>([]);
+  const [sessionStartedAt, setSessionStartedAt] = useState<string | null>(null);
+  const [pendingPRs, setPendingPRs] = useState<PRRecord[] | null>(null);
+  const [showPRModal, setShowPRModal] = useState(false);
+  const [pendingStatsData, setPendingStatsData] = useState<{
+    duration: number;
+    exercises: ExerciseState[];
+    sessionId: string;
+  } | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const restTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(Date.now());
@@ -100,9 +118,75 @@ export default function SessionPage() {
             })),
           }))
         );
+
+        // Fetch 90-day history for these exercises so we can show autoreg hints.
+        // Batched into a single query — per-exercise computation happens client-side.
+        const exerciseIds = workoutExercises
+          .map((we: WorkoutExercise) => we.exercise_id)
+          .filter(Boolean);
+
+        if (exerciseIds.length > 0 && session.user_id) {
+          const ninetyDaysAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+          // RLS on session_sets is ownership-scoped via session_id. To stay within
+          // policy and avoid a cross-user leak, scope by the user's own sessions.
+          const { data: userSessions } = await supabase
+            .from("workout_sessions")
+            .select("id, started_at")
+            .eq("user_id", session.user_id)
+            .gte("started_at", ninetyDaysAgo);
+
+          const sessionIds = (userSessions ?? []).map((s) => s.id);
+          const sessionStartedAtById = new Map<string, string>(
+            (userSessions ?? []).map((s) => [s.id, s.started_at as string]),
+          );
+
+          if (sessionIds.length > 0) {
+            const { data: rawSets } = await supabase
+              .from("session_sets")
+              .select(
+                "session_id, exercise_id, set_number, reps_completed, weight_used, rpe, created_at, exercise:exercises(name, muscle_group:muscle_groups(id, name))",
+              )
+              .in("session_id", sessionIds)
+              .in("exercise_id", exerciseIds)
+              .gte("created_at", ninetyDaysAgo);
+
+            type RawSet = {
+              session_id: string;
+              exercise_id: string;
+              set_number: number;
+              reps_completed: number;
+              weight_used: number | null;
+              rpe: number | null;
+              created_at: string;
+              exercise?: {
+                name?: string;
+                muscle_group?: { id?: string; name?: string } | null;
+              } | null;
+            };
+
+            const mapped: SetLog[] = (rawSets as RawSet[] | null ?? []).map((r) => {
+              const startedAt = sessionStartedAtById.get(r.session_id) ?? r.created_at;
+              return {
+                session_id: r.session_id,
+                exercise_id: r.exercise_id,
+                exercise_name: r.exercise?.name ?? "",
+                muscle_group_name: r.exercise?.muscle_group?.name ?? "",
+                muscle_group_id: r.exercise?.muscle_group?.id ?? "",
+                set_number: r.set_number,
+                reps_completed: r.reps_completed,
+                weight_used: r.weight_used,
+                rpe: r.rpe,
+                created_at: r.created_at,
+                session_date: startedAt.slice(0, 10),
+              };
+            });
+            setHistory(mapped);
+          }
+        }
       }
 
       startTimeRef.current = new Date(session.started_at).getTime();
+      setSessionStartedAt(session.started_at as string);
       setLoading(false);
     }
     load();
@@ -304,10 +388,137 @@ export default function SessionPage() {
     }
 
     if (timerRef.current) clearInterval(timerRef.current);
-    setSessionData({ duration: elapsed, exercises, sessionId });
+
+    // PR detection — best effort, never blocks completion.
+    let prsToShow: PRRecord[] = [];
+    try {
+      if (sessionStartedAt) {
+        const trainedExerciseIds = Array.from(
+          new Set(
+            exercises
+              .filter((ex) => ex.sets.some((s) => s.completed))
+              .map((ex) => ex.exercise_id),
+          ),
+        );
+
+        if (trainedExerciseIds.length > 0) {
+          // Look back 180d max, or since the user's first tracked session.
+          const windowStart = new Date(Date.now() - 180 * 86_400_000).toISOString();
+          const { data: userSessions } = await supabase
+            .from("workout_sessions")
+            .select("id, started_at, user_id")
+            .gte("started_at", windowStart);
+
+          const sessionIds = (userSessions ?? []).map((s) => s.id);
+          const sessionStartedAtById = new Map<string, string>(
+            (userSessions ?? []).map((s) => [s.id, s.started_at as string]),
+          );
+
+          if (sessionIds.length > 0) {
+            const { data: rawSets } = await supabase
+              .from("session_sets")
+              .select(
+                "session_id, exercise_id, set_number, reps_completed, weight_used, rpe, created_at, exercise:exercises(name, muscle_group:muscle_groups(id, name))",
+              )
+              .in("session_id", sessionIds)
+              .in("exercise_id", trainedExerciseIds)
+              .lte("created_at", endTime);
+
+            type RawSet = {
+              session_id: string;
+              exercise_id: string;
+              set_number: number;
+              reps_completed: number;
+              weight_used: number | null;
+              rpe: number | null;
+              created_at: string;
+              exercise?: {
+                name?: string;
+                muscle_group?: { id?: string; name?: string } | null;
+              } | null;
+            };
+
+            const fullHistory: SetLog[] = (rawSets as RawSet[] | null ?? []).map(
+              (r) => {
+                const startedAt = sessionStartedAtById.get(r.session_id) ?? r.created_at;
+                return {
+                  session_id: r.session_id,
+                  exercise_id: r.exercise_id,
+                  exercise_name: r.exercise?.name ?? "",
+                  muscle_group_name: r.exercise?.muscle_group?.name ?? "",
+                  muscle_group_id: r.exercise?.muscle_group?.id ?? "",
+                  set_number: r.set_number,
+                  reps_completed: r.reps_completed,
+                  weight_used: r.weight_used,
+                  rpe: r.rpe,
+                  created_at: r.created_at,
+                  session_date: startedAt.slice(0, 10),
+                };
+              },
+            );
+
+            // Supplement freshly-inserted sets (server round-trip can lag) with
+            // what we just logged locally, so PRs land even on the same-day boundary.
+            const localFresh: SetLog[] = exercises.flatMap((ex) =>
+              ex.sets
+                .filter((s) => s.completed)
+                .map((s) => ({
+                  session_id: sessionId,
+                  exercise_id: ex.exercise_id,
+                  exercise_name: ex.exercise.name,
+                  muscle_group_name: ex.exercise.muscle_group?.name ?? "",
+                  muscle_group_id: "",
+                  set_number: s.set_number,
+                  reps_completed: s.reps_completed,
+                  weight_used: s.weight_used,
+                  rpe: s.rpe,
+                  created_at: endTime,
+                  session_date: sessionStartedAt.slice(0, 10),
+                })),
+            );
+            // Dedupe by session_id+set_number+exercise_id — prefer DB copy if present.
+            const seen = new Set(
+              fullHistory.map((s) => `${s.session_id}|${s.exercise_id}|${s.set_number}`),
+            );
+            for (const s of localFresh) {
+              const key = `${s.session_id}|${s.exercise_id}|${s.set_number}`;
+              if (!seen.has(key)) fullHistory.push(s);
+            }
+
+            const sessionStartDate = sessionStartedAt.slice(0, 10);
+            prsToShow = detectPRs(fullHistory, sessionStartDate);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[session] PR detection failed:", err);
+      prsToShow = [];
+    }
+
+    const statsData = { duration: elapsed, exercises, sessionId };
+
+    if (prsToShow.length > 0) {
+      setPendingPRs(prsToShow);
+      setPendingStatsData(statsData);
+      setShowPRModal(true);
+      setShowEndConfirm(false);
+      return;
+    }
+
+    setSessionData(statsData);
     setShowStats(true);
     setShowEndConfirm(false);
-  }, [exercises, elapsed, params.id]);
+  }, [exercises, elapsed, params.id, sessionStartedAt]);
+
+  const dismissPRModal = useCallback(() => {
+    setShowPRModal(false);
+    if (pendingStatsData) {
+      setSessionData(pendingStatsData);
+      setShowStats(true);
+      setPendingStatsData(null);
+    }
+    setPendingPRs(null);
+  }, [pendingStatsData]);
 
   if (loading) {
     return (
@@ -323,6 +534,10 @@ export default function SessionPage() {
 
   const current = exercises[currentIndex];
   if (!current) return null;
+
+  const autoreg: AutoregulationResult = history.length > 0
+    ? autoregulationPrescription(history, current.exercise_id, 8, unit)
+    : {};
 
   const completedSets = current.sets.filter((s) => s.completed).length;
   const totalCompletedAll = exercises.reduce((sum, ex) => sum + ex.sets.filter((s) => s.completed).length, 0);
@@ -414,6 +629,13 @@ export default function SessionPage() {
 
             {/* Sets — header fixed, rows scroll if overflow */}
             <div className="flex flex-col min-h-0 flex-1">
+              {(autoreg.last || autoreg.suggested) && (
+                <AutoregHint
+                  last={autoreg.last ?? null}
+                  suggested={autoreg.suggested ?? null}
+                  unit={unit}
+                />
+              )}
               <div className="grid grid-cols-[32px_1fr_1fr_44px] gap-2 px-2 text-xs text-subtext mb-1 shrink-0">
                 <span className="text-center">Set</span>
                 <span className="text-center">Reps</span>
@@ -622,6 +844,14 @@ export default function SessionPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* PR Celebration Modal */}
+      <PRCelebrationModal
+        prs={pendingPRs ?? []}
+        open={showPRModal && (pendingPRs?.length ?? 0) > 0}
+        onClose={dismissPRModal}
+        unit={unit}
+      />
 
       {/* Exercise Swap Modal */}
       {showSwapModal && (
