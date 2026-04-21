@@ -850,6 +850,135 @@ export function linearProjection(
   return { slope, projectedE1rm, confidence };
 }
 
+// ─────────────────────────────────────────────────────────────
+// Function 11: sessionReadiness
+// ─────────────────────────────────────────────────────────────
+
+export type ReadinessLevel = "fresh" | "moderate" | "fatigued";
+
+export interface ReadinessResult {
+  level: ReadinessLevel;
+  score: number; // 0-100, higher = fresher
+  reasons: string[];
+  avgRecentRPE: number | null;
+  muscleRest: Array<{ muscle: string; daysAgo: number | null }>;
+}
+
+/**
+ * Estimate training readiness for an upcoming session.
+ *
+ * Signals:
+ *  1. Avg RPE over the last 7 days (>=9 → fatigued, 8–8.9 → moderate).
+ *  2. For each target muscle group, days since last working set.
+ *     - Worked yesterday or today → fatigue penalty.
+ *     - >= 2 days rest → neutral.
+ *  3. Volume in the last 3 days relative to recent baseline (soft penalty
+ *     when recent 3d tonnage > 1.5x the prior 7d avg).
+ *
+ * @param sets All historical sets for the user.
+ * @param targetMuscles Muscle group names this upcoming session will hit.
+ * @param now Optional override for "now" (testing).
+ *
+ * @example
+ *   sessionReadiness(sets, ["Chest", "Triceps"])
+ *   // { level: "moderate", score: 72, reasons: [...], ... }
+ */
+export function sessionReadiness(
+  sets: SetLog[],
+  targetMuscles: string[],
+  now: Date = new Date(),
+): ReadinessResult {
+  const todayISO = now.toISOString().slice(0, 10);
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const threeDaysAgo = new Date(now.getTime() - 3 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  const tenDaysAgo = new Date(now.getTime() - 10 * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+
+  let score = 100;
+  const reasons: string[] = [];
+
+  // Signal 1: recent RPE
+  const recentRpes = sets
+    .filter((s) => s.session_date >= sevenDaysAgo && s.rpe != null)
+    .map((s) => s.rpe as number);
+  const avgRecentRPE =
+    recentRpes.length > 0
+      ? recentRpes.reduce((a, b) => a + b, 0) / recentRpes.length
+      : null;
+  if (avgRecentRPE != null) {
+    if (avgRecentRPE >= 9) {
+      score -= 35;
+      reasons.push(`7-day avg RPE ${avgRecentRPE.toFixed(1)} — high fatigue signal.`);
+    } else if (avgRecentRPE >= 8) {
+      score -= 15;
+      reasons.push(`7-day avg RPE ${avgRecentRPE.toFixed(1)} — pushing hard lately.`);
+    }
+  }
+
+  // Signal 2: days since muscle last hit
+  const muscleRest: ReadinessResult["muscleRest"] = [];
+  const normalizedTargets = targetMuscles.map((m) => m.toLowerCase());
+  for (const target of targetMuscles) {
+    const hits = sets.filter(
+      (s) =>
+        s.muscle_group_name.toLowerCase() === target.toLowerCase() &&
+        (s.weight_used ?? 0) > 0 &&
+        s.reps_completed >= 3,
+    );
+    if (hits.length === 0) {
+      muscleRest.push({ muscle: target, daysAgo: null });
+      continue;
+    }
+    const latest = hits.reduce((m, s) =>
+      s.session_date > m ? s.session_date : m, "0000-00-00",
+    );
+    const days = Math.floor(daysBetween(latest, todayISO));
+    muscleRest.push({ muscle: target, daysAgo: days });
+    if (days <= 0) {
+      score -= 25;
+      reasons.push(`${target} trained today already.`);
+    } else if (days === 1) {
+      score -= 12;
+      reasons.push(`${target} trained yesterday — limited recovery.`);
+    }
+  }
+
+  // Signal 3: recent tonnage spike
+  const base = sets.filter(
+    (s) => s.session_date >= tenDaysAgo && (s.weight_used ?? 0) > 0,
+  );
+  const tonnageIn = (fromISO: string) =>
+    base
+      .filter((s) => s.session_date >= fromISO)
+      .reduce((a, s) => a + (s.weight_used! * s.reps_completed), 0);
+  const recent3 = tonnageIn(threeDaysAgo);
+  const prior7 = tonnageIn(sevenDaysAgo) - recent3;
+  const prior7Avg = prior7 / 7;
+  const recent3Avg = recent3 / 3;
+  if (prior7Avg > 0 && recent3Avg > prior7Avg * 1.5) {
+    score -= 10;
+    reasons.push("Recent 3-day tonnage well above baseline.");
+  }
+
+  score = Math.max(0, Math.min(100, score));
+  const level: ReadinessLevel =
+    score >= 75 ? "fresh" : score >= 50 ? "moderate" : "fatigued";
+
+  if (reasons.length === 0) {
+    reasons.push("Low stress signals — good to train.");
+  }
+
+  // Suppress unused warning for normalizedTargets; kept for potential future use.
+  void normalizedTargets;
+
+  return { level, score, reasons, avgRecentRPE, muscleRest };
+}
+
 /* Self-check examples (documentation only — not executed)
  *
  * estimatedOneRepMax(100, 5, 8)   ≈ 123.5kg  (RIR 2, 7 reps-to-failure, 81% of 1RM → 100/0.81)

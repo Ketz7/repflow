@@ -5,6 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import {
+  sessionReadiness,
+  type ReadinessResult,
+  type SetLog,
+} from "@/lib/training-analytics";
+import ReadinessBadge from "@/components/session/ReadinessBadge";
+import { toLocalDate } from "@/lib/utils";
 
 interface ExerciseRow {
   exercise_id: string;
@@ -34,6 +41,7 @@ function WorkoutPreviewInner() {
   const [exercises, setExercises]       = useState<ExerciseRow[]>([]);
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const [alreadyDone, setAlreadyDone]   = useState(false);
+  const [readiness, setReadiness]       = useState<ReadinessResult | null>(null);
 
   useEffect(() => {
     if (!workoutId) { router.replace("/calendar"); return; }
@@ -109,6 +117,70 @@ function WorkoutPreviewInner() {
       setOpenSessionId(freshOpen?.id ?? null);
 
       setAlreadyDone((doneSessions || []).length > 0);
+
+      // Compute readiness from last ~14 days of training
+      type WeRow = {
+        exercise?: { muscle_group?: { name?: string | null } | null } | null;
+      };
+      const targetMuscles = Array.from(
+        new Set(
+          ((workoutExercises as WeRow[] | null) || [])
+            .map((we) => we.exercise?.muscle_group?.name ?? null)
+            .filter((m): m is string => !!m)
+        )
+      );
+      const fourteenDaysAgo = new Date(Date.now() - 14 * 86_400_000).toISOString();
+      const { data: recentSess } = await supabase
+        .from("workout_sessions")
+        .select("id, started_at")
+        .eq("user_id", user.id)
+        .gte("started_at", fourteenDaysAgo);
+      const recentSessionIds = (recentSess || []).map((s) => s.id);
+      if (recentSessionIds.length > 0) {
+        const { data: recentSets } = await supabase
+          .from("session_sets")
+          .select(
+            "session_id, exercise_id, set_number, reps_completed, weight_used, rpe, created_at, exercise:exercises(name, muscle_group:muscle_groups(id, name))"
+          )
+          .in("session_id", recentSessionIds);
+
+        const sessDateById = new Map(
+          (recentSess || []).map((s) => [s.id, toLocalDate(new Date(s.started_at))])
+        );
+        type RecentSetRow = {
+          session_id: string;
+          exercise_id: string;
+          set_number: number;
+          reps_completed: number;
+          weight_used: number | null;
+          rpe: number | null;
+          created_at: string;
+          exercise: {
+            name: string | null;
+            muscle_group: { id: string; name: string | null } | null;
+          } | null;
+        };
+        const logs: SetLog[] = ((recentSets as RecentSetRow[] | null) || [])
+          .filter((s) => sessDateById.has(s.session_id))
+          .map((s) => ({
+            session_id: s.session_id,
+            exercise_id: s.exercise_id,
+            exercise_name: s.exercise?.name ?? "(unknown)",
+            muscle_group_name: s.exercise?.muscle_group?.name ?? "(unknown)",
+            muscle_group_id: s.exercise?.muscle_group?.id ?? "",
+            set_number: s.set_number,
+            reps_completed: s.reps_completed,
+            weight_used: s.weight_used,
+            rpe: s.rpe,
+            created_at: s.created_at,
+            session_date: sessDateById.get(s.session_id)!,
+          }));
+        setReadiness(sessionReadiness(logs, targetMuscles));
+      } else {
+        // No history — assume fresh
+        setReadiness(sessionReadiness([], targetMuscles));
+      }
+
       setLoading(false);
     }
     load();
@@ -147,6 +219,9 @@ function WorkoutPreviewInner() {
         {formattedDate && <p className="text-sm text-subtext mt-0.5">{formattedDate}</p>}
         <p className="text-xs text-subtext/60 mt-1">{exercises.length} exercises</p>
       </div>
+
+      {/* Readiness indicator */}
+      {readiness && <ReadinessBadge result={readiness} />}
 
       {/* Redo warning banner */}
       {alreadyDone && !openSessionId && (

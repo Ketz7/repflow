@@ -21,12 +21,14 @@ import {
   volumeRecommendation,
   rpeCalibrationDrift,
   bestE1RMByExercise,
+  linearProjection,
   type SetLog,
   type TrainingGoal,
   type VolumeStatus,
   type StagnationRecord,
   type GoalAlignmentResult,
   type CalibrationDrift,
+  type LinearProjection,
 } from "@/lib/training-analytics";
 
 interface PersonalRecord {
@@ -634,6 +636,15 @@ export default function ProgressPage() {
           .sort((a, b) => b[1].e1rm - a[1].e1rm)
           .slice(0, 5);
 
+        // Trajectory projections (8 weeks out) for the same top exercises
+        const projections: Array<{ id: string; name: string; current: number; proj: LinearProjection }> =
+          top1RMs
+            .map(([id, b]) => {
+              const proj = linearProjection(setLogs, id, 8);
+              return proj ? { id, name: b.exercise_name, current: b.e1rm, proj } : null;
+            })
+            .filter((x): x is { id: string; name: string; current: number; proj: LinearProjection } => x !== null);
+
         const scoreColor =
           alignment.score >= 70 ? "text-success" :
           alignment.score >= 40 ? "text-primary" :
@@ -726,6 +737,50 @@ export default function ProgressPage() {
                 <p className="text-[10px] text-subtext/60 mt-3">
                   RPE-adjusted (RTS chart) when RPE logged; otherwise Epley.
                 </p>
+              </motion.div>
+            )}
+
+            {/* 8-week trajectory */}
+            {projections.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.12 }}
+                className="rounded-2xl bg-card border border-border p-4"
+              >
+                <h3 className="text-sm font-semibold text-foreground mb-1">8-Week Trajectory</h3>
+                <p className="text-xs text-subtext mb-3">
+                  Linear projection of your e1RM if current pace holds. Low confidence on short histories.
+                </p>
+                <div className="space-y-2">
+                  {projections.map((p) => {
+                    const diff = p.proj.projectedE1rm - p.current;
+                    const pct = p.current > 0 ? (diff / p.current) * 100 : 0;
+                    const cls =
+                      pct > 2 ? "text-success" :
+                      pct < -2 ? "text-error" :
+                      "text-subtext";
+                    const confCls =
+                      p.proj.confidence === "high" ? "text-success" :
+                      p.proj.confidence === "medium" ? "text-primary" :
+                      "text-subtext";
+                    return (
+                      <div key={p.id} className="flex items-center gap-3 p-2 rounded-lg bg-white/5">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                          <p className="text-[10px] text-subtext">
+                            now {formatWeight(p.current)} → {formatWeight(Math.max(0, p.proj.projectedE1rm))} {unitLabel}
+                            {" · "}
+                            <span className={confCls}>{p.proj.confidence} confidence</span>
+                          </p>
+                        </div>
+                        <span className={`text-xs font-medium tabular-nums ${cls}`}>
+                          {pct > 0 ? "+" : ""}{pct.toFixed(1)}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </motion.div>
             )}
 
