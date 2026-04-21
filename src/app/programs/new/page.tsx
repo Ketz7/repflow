@@ -1,26 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Exercise, MuscleGroup } from "@/types";
+import type { WorkoutDraft } from "@/types/programs";
+import { newProgramKey } from "@/lib/program-drafts";
+import { useProgramDraft } from "@/hooks/useProgramDraft";
+import DraftBanner from "@/components/programs/DraftBanner";
+import DraftSavedIndicator from "@/components/programs/DraftSavedIndicator";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface WorkoutDraft {
-  id: string;
-  name: string;
-  exercises: {
-    id: string;
-    exercise_id: string;
-    exercise_name: string;
-    muscle_group_icon: string;
-    target_sets: number;
-    target_reps: number;
-  }[];
-}
 
 export default function NewProgramPage() {
   const router = useRouter();
@@ -28,6 +20,29 @@ export default function NewProgramPage() {
   const [description, setDescription] = useState("");
   const [workouts, setWorkouts] = useState<WorkoutDraft[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const draftKey = useMemo(() => newProgramKey(), []);
+  const {
+    pendingDraft,
+    dismissBanner,
+    discardDraft,
+    clearDraft,
+    savedIndicatorVisible,
+  } = useProgramDraft({
+    key: draftKey,
+    name,
+    description,
+    workouts,
+    enabled: true,
+  });
+
+  const handleResume = () => {
+    if (!pendingDraft) return;
+    setName(pendingDraft.name);
+    setDescription(pendingDraft.description);
+    setWorkouts(pendingDraft.workouts);
+    dismissBanner();
+  };
 
   // Exercise picker state
   const [showExercisePicker, setShowExercisePicker] = useState(false);
@@ -161,6 +176,7 @@ export default function NewProgramPage() {
       }
     }
 
+    clearDraft();
     router.push("/programs");
   };
 
@@ -172,6 +188,15 @@ export default function NewProgramPage() {
 
   return (
     <div className="px-4 pt-6 pb-4">
+      <AnimatePresence>
+        {pendingDraft && (
+          <DraftBanner
+            savedAt={pendingDraft.savedAt}
+            onResume={handleResume}
+            onDiscard={discardDraft}
+          />
+        )}
+      </AnimatePresence>
       <h1 className="text-2xl font-bold text-foreground mb-6">New Program</h1>
 
       <div className="space-y-4 mb-6">
@@ -262,9 +287,12 @@ export default function NewProgramPage() {
       </div>
 
       {/* Save */}
-      <Button size="lg" className="w-full" disabled={!name.trim() || saving} onClick={handleSave}>
-        {saving ? "Creating..." : "Create Program"}
-      </Button>
+      <div className="flex items-center justify-end gap-3">
+        <DraftSavedIndicator visible={savedIndicatorVisible} />
+        <Button size="lg" className="flex-1" disabled={!name.trim() || saving} onClick={handleSave}>
+          {saving ? "Creating..." : "Create Program"}
+        </Button>
+      </div>
 
       {/* Exercise Picker Modal */}
       <Modal isOpen={showExercisePicker} onClose={() => setShowExercisePicker(false)} title="Add Exercise">
