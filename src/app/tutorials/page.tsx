@@ -1,263 +1,249 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
-import { useCachedQuery } from "@/hooks/useCachedQuery";
-import Input from "@/components/ui/Input";
-import YouTubeEmbed from "@/components/exercises/YouTubeEmbed";
+import Button from "@/components/ui/Button";
 
-interface MuscleGroupLite {
+interface Guide {
   id: string;
-  name: string;
   icon: string;
-  sort_order: number;
+  title: string;
+  summary: string;
+  intro: string;
+  steps: string[];
+  tip?: string;
+  cta: { label: string; href: string };
 }
 
-interface TutorialExercise {
-  id: string;
-  name: string;
-  youtube_url: string;
-  muscle_group_id: string;
-  muscle_group: MuscleGroupLite | null;
-}
-
-interface TutorialData {
-  exercises: TutorialExercise[];
-  muscleGroups: MuscleGroupLite[];
-}
+const GUIDES: Guide[] = [
+  {
+    id: "getting-started",
+    icon: "🚀",
+    title: "Getting Started",
+    summary: "New to RepFlow? Start here.",
+    intro:
+      "RepFlow keeps your training, nutrition, and body-composition trends in one place. A few minutes of setup unlocks everything.",
+    steps: [
+      "Sign up with your email and a strong password.",
+      "Verify your email via the confirmation link we send.",
+      "You'll land on the home dashboard — your daily hub.",
+      "Tap the Profile tab and fill in your weight, height, activity level, and goal.",
+      "That's it — you're ready to build your first program.",
+    ],
+    cta: { label: "Open profile", href: "/profile" },
+  },
+  {
+    id: "building-program",
+    icon: "🏗️",
+    title: "Building a Program",
+    summary: "Design a reusable workout template you can assign to any day.",
+    intro:
+      "Programs are reusable workout templates. Build one, assign it to the calendar, and you'll know exactly what to do on any given day.",
+    steps: [
+      'From the Programs tab, tap "+ New Program".',
+      'Give it a name and optional description (e.g. "PPL 6-day split").',
+      'Add workouts — one per training day. Name them (e.g. "Push Day").',
+      "Inside each workout, add exercises from the picker and set target sets × reps.",
+      "Reorder exercises by dragging the ⋮⋮ handle.",
+      'Tap "Create Program" — you\'re done. Drafts auto-save so you won\'t lose progress if you navigate away.',
+    ],
+    tip: "Closed the tab mid-edit? The resume banner will let you pick up where you left off on your next visit.",
+    cta: { label: "Build a program", href: "/programs/new" },
+  },
+  {
+    id: "tracking-workout",
+    icon: "🏋️",
+    title: "Tracking a Workout",
+    summary: "Log sets in real time with a built-in rest timer.",
+    intro:
+      "Open a scheduled workout to log your sets in real time — no more scribbling numbers between sets.",
+    steps: [
+      'From the calendar or Programs tab, tap "Start Workout".',
+      "Tap each set as you complete it to mark it done.",
+      "The rest timer floats into view — drag it anywhere on screen.",
+      "Log your reps and weight for every set.",
+      "Tap Finish when you've wrapped the session.",
+    ],
+    tip: "The rest timer pops up automatically between sets. Tap +30s to extend or Skip to move on.",
+    cta: { label: "See your programs", href: "/programs" },
+  },
+  {
+    id: "reading-progress",
+    icon: "📈",
+    title: "Reading Your Progress",
+    summary: "Turn workout history into trends you can act on.",
+    intro:
+      "The Progress tab turns your workout history into trends you can actually act on — volume, muscle balance, and PRs.",
+    steps: [
+      "Tap the Progress tab.",
+      "Browse volume over time, per-muscle-group breakdowns, and your best-ever lifts.",
+      "Tap any exercise to see a strength-progression chart.",
+      "Use the date-range filter to focus on a specific training block.",
+    ],
+    cta: { label: "Open progress", href: "/progress" },
+  },
+  {
+    id: "calendar",
+    icon: "📅",
+    title: "Using the Calendar",
+    summary: "Plan your training days and review what you actually did.",
+    intro:
+      "Assign programs to specific days and track what you actually did. The calendar is your training ledger.",
+    steps: [
+      "Open the Calendar tab.",
+      "Tap a date to pick a day.",
+      "Assign a workout from your active program.",
+      "Tap a completed session on any past date to review it.",
+    ],
+    tip: "Completed sessions show with a ring. Missed sessions are greyed — tap to log them retroactively.",
+    cta: { label: "Open calendar", href: "/calendar" },
+  },
+  {
+    id: "profile",
+    icon: "👤",
+    title: "Customizing Your Profile",
+    summary: "Drive calorie targets, macro goals, and body-comp trends.",
+    intro:
+      "Your profile drives calorie targets, macro goals, and body-composition trends. Keep it current for accurate recommendations.",
+    steps: [
+      "Go to the Profile tab.",
+      "Update your weight, height, activity level, and goal.",
+      "Optionally add a profile photo.",
+      "Log body-weight changes regularly for accurate trend charts.",
+    ],
+    cta: { label: "Open profile", href: "/profile" },
+  },
+  {
+    id: "exercise-library",
+    icon: "💪",
+    title: "Exercise Library",
+    summary: "Search the full exercise catalogue with form videos.",
+    intro:
+      "Looking up an exercise? The Exercises tab has the full library with form videos and cues.",
+    steps: [
+      "Open the Exercises tab.",
+      "Search by name or filter by muscle group.",
+      "Tap any exercise to watch the form video and read tips.",
+    ],
+    cta: { label: "Browse exercises", href: "/exercises" },
+  },
+];
 
 export default function TutorialsPage() {
-  const [search, setSearch] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const { data, loading } = useCachedQuery<TutorialData>(
-    "tutorials:library",
-    async () => {
-      const supabase = createClient();
-      const [{ data: exs }, { data: groups }] = await Promise.all([
-        supabase
-          .from("exercises")
-          .select(
-            "id, name, youtube_url, muscle_group_id, muscle_group:muscle_groups(id, name, icon, sort_order)",
-          )
-          .eq("is_approved", true)
-          .not("youtube_url", "is", null)
-          .order("name"),
-        supabase
-          .from("muscle_groups")
-          .select("id, name, icon, sort_order")
-          .order("sort_order"),
-      ]);
-      // Supabase's typed relation join can return an array when it can't infer
-      // a unique FK; normalise to a single object for our UI.
-      const normalised: TutorialExercise[] = (exs || []).map((e: {
-        id: string;
-        name: string;
-        youtube_url: string;
-        muscle_group_id: string;
-        muscle_group: MuscleGroupLite | MuscleGroupLite[] | null;
-      }) => ({
-        id: e.id,
-        name: e.name,
-        youtube_url: e.youtube_url,
-        muscle_group_id: e.muscle_group_id,
-        muscle_group: Array.isArray(e.muscle_group)
-          ? e.muscle_group[0] ?? null
-          : e.muscle_group,
-      }));
-      return { exercises: normalised, muscleGroups: groups || [] };
-    },
-  );
-
-  const exercises = data?.exercises ?? [];
-  const muscleGroups = data?.muscleGroups ?? [];
-
-  const filtered = useMemo(() => {
-    const needle = search.trim().toLowerCase();
-    return exercises.filter((e) => {
-      const matchesSearch = !needle || e.name.toLowerCase().includes(needle);
-      const matchesGroup = !selectedGroup || e.muscle_group_id === selectedGroup;
-      return matchesSearch && matchesGroup;
-    });
-  }, [exercises, search, selectedGroup]);
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, TutorialExercise[]>();
-    for (const ex of filtered) {
-      const key = ex.muscle_group?.name || "Other";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(ex);
-    }
-    // Order by muscle-group sort_order
-    return Array.from(map.entries()).sort(([a], [b]) => {
-      const sa = muscleGroups.find((g) => g.name === a)?.sort_order ?? 999;
-      const sb = muscleGroups.find((g) => g.name === b)?.sort_order ?? 999;
-      return sa - sb;
-    });
-  }, [filtered, muscleGroups]);
-
-  if (loading) {
-    return (
-      <div className="px-4 pt-6 max-w-lg mx-auto">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-40 bg-card rounded-lg" />
-          <div className="h-4 w-64 bg-card rounded" />
-          <div className="h-10 bg-card rounded-xl" />
-          <div className="h-8 bg-card rounded-full w-3/4" />
-          <div className="h-20 bg-card rounded-2xl" />
-          <div className="h-20 bg-card rounded-2xl" />
-          <div className="h-20 bg-card rounded-2xl" />
-        </div>
-      </div>
-    );
-  }
-
-  const renderRow = (ex: TutorialExercise) => {
-    const isOpen = expandedId === ex.id;
-    return (
-      <motion.div
-        key={ex.id}
-        layout
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -6 }}
-        className="rounded-2xl bg-surface border border-border overflow-hidden"
-      >
-        <button
-          type="button"
-          onClick={() => setExpandedId(isOpen ? null : ex.id)}
-          className="w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-white/5 transition-colors"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="text-xl shrink-0" aria-hidden>
-              {ex.muscle_group?.icon || "💪"}
-            </span>
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-foreground truncate">
-                {ex.name}
-              </div>
-              {ex.muscle_group?.name && (
-                <div className="text-[11px] text-subtext truncate">
-                  {ex.muscle_group.name}
-                </div>
-              )}
-            </div>
-          </div>
-          <span
-            className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              isOpen
-                ? "bg-primary text-background"
-                : "bg-card text-subtext border border-border"
-            }`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-3 h-3"
-            >
-              <path d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
-            </svg>
-            {isOpen ? "Close" : "Watch"}
-          </span>
-        </button>
-        <AnimatePresence initial={false}>
-          {isOpen && (
-            <motion.div
-              key="video"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="p-3 pt-0">
-                <YouTubeEmbed url={ex.youtube_url} />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
-    );
-  };
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-foreground mb-1">Tutorials</h1>
+      <h1 className="text-2xl font-bold text-foreground mb-2">
+        How to use RepFlow
+      </h1>
       <p className="text-sm text-subtext mb-6">
-        Learn proper form from curated video guides.
+        Quick guides to every feature.
       </p>
 
-      <Input
-        placeholder="Search exercises…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="mb-3"
-      />
-
-      <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
-        <button
-          type="button"
-          onClick={() => setSelectedGroup(null)}
-          className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-            !selectedGroup
-              ? "bg-primary text-background"
-              : "bg-card text-subtext border border-border"
-          }`}
-        >
-          All
-        </button>
-        {muscleGroups.map((g) => (
-          <button
-            type="button"
-            key={g.id}
-            onClick={() =>
-              setSelectedGroup(selectedGroup === g.id ? null : g.id)
-            }
-            className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-              selectedGroup === g.id
-                ? "bg-primary text-background"
-                : "bg-card text-subtext border border-border"
-            }`}
-          >
-            {g.icon} {g.name}
-          </button>
-        ))}
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-subtext text-sm">
-            No tutorials match your filters yet.
-          </p>
-        </div>
-      ) : selectedGroup ? (
-        <div className="space-y-2">
-          <AnimatePresence initial={false}>
-            {filtered.map(renderRow)}
-          </AnimatePresence>
-        </div>
-      ) : (
-        <div className="space-y-6">
-          {grouped.map(([groupName, exs]) => (
-            <div key={groupName}>
-              <h3 className="text-sm font-semibold text-subtext uppercase tracking-wider mb-2">
-                {groupName}{" "}
-                <span className="text-subtext/70 font-normal">
-                  ({exs.length})
+      <div className="space-y-3">
+        {GUIDES.map((guide) => {
+          const isOpen = expandedId === guide.id;
+          return (
+            <motion.div
+              key={guide.id}
+              layout
+              className="rounded-2xl bg-card border border-border overflow-hidden"
+            >
+              <button
+                type="button"
+                onClick={() => setExpandedId(isOpen ? null : guide.id)}
+                aria-expanded={isOpen}
+                className="w-full flex items-center justify-between gap-3 p-4 text-left hover:bg-white/5 transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-2xl shrink-0" aria-hidden>
+                    {guide.icon}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-foreground truncate">
+                      {guide.title}
+                    </div>
+                    <div className="text-xs text-subtext truncate">
+                      {guide.summary}
+                    </div>
+                  </div>
+                </div>
+                <span
+                  className={`shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-all ${
+                    isOpen
+                      ? "bg-primary text-background rotate-180"
+                      : "bg-surface text-subtext border border-border"
+                  }`}
+                  aria-hidden
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-3 h-3"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M12.53 16.28a.75.75 0 0 1-1.06 0l-7.5-7.5a.75.75 0 0 1 1.06-1.06L12 14.69l6.97-6.97a.75.75 0 1 1 1.06 1.06l-7.5 7.5Z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
                 </span>
-              </h3>
-              <div className="space-y-2">
-                <AnimatePresence initial={false}>
-                  {exs.map(renderRow)}
-                </AnimatePresence>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    key="body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-4 pt-0 space-y-4 border-t border-border">
+                      <p className="text-sm text-subtext pt-4">
+                        {guide.intro}
+                      </p>
+
+                      <ol className="space-y-3">
+                        {guide.steps.map((step, i) => (
+                          <li key={i} className="flex gap-3">
+                            <span className="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 border border-primary/30 text-primary text-xs font-semibold">
+                              {i + 1}
+                            </span>
+                            <span className="text-sm text-foreground leading-relaxed">
+                              {step}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+
+                      {guide.tip && (
+                        <div className="bg-primary/10 border border-primary/30 rounded-xl p-3 text-sm text-foreground">
+                          <span className="mr-1" aria-hidden>
+                            💡
+                          </span>
+                          <span className="font-medium text-primary">Tip:</span>{" "}
+                          <span className="text-subtext">{guide.tip}</span>
+                        </div>
+                      )}
+
+                      <Link href={guide.cta.href} className="block">
+                        <Button variant="primary" size="md" className="w-full">
+                          {guide.cta.label} →
+                        </Button>
+                      </Link>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          );
+        })}
+      </div>
     </div>
   );
 }
