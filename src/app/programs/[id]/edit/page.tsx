@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Exercise, MuscleGroup } from "@/types";
-import type { WorkoutDraft } from "@/types/programs";
+import type { WorkoutDraft, WorkoutExerciseDraft } from "@/types/programs";
 import { editProgramKey } from "@/lib/program-drafts";
 import { useProgramDraft } from "@/hooks/useProgramDraft";
 import DraftBanner from "@/components/programs/DraftBanner";
@@ -12,7 +12,56 @@ import DraftSavedIndicator from "@/components/programs/DraftSavedIndicator";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Reorder, useDragControls } from "framer-motion";
+
+function ExerciseRow({
+  ex,
+  onUpdate,
+  onRemove,
+}: {
+  ex: WorkoutExerciseDraft;
+  onUpdate: (field: "target_sets" | "target_reps", value: number) => void;
+  onRemove: () => void;
+}) {
+  const dragControls = useDragControls();
+  return (
+    <Reorder.Item
+      value={ex}
+      dragListener={false}
+      dragControls={dragControls}
+      className="flex items-center gap-2 p-2 rounded-xl bg-surface touch-none"
+      whileDrag={{ scale: 1.02, boxShadow: "0 8px 20px rgba(0,0,0,0.3)" }}
+    >
+      <span
+        onPointerDown={(e) => dragControls.start(e)}
+        className="text-subtext cursor-grab active:cursor-grabbing select-none touch-none"
+        aria-label="Drag to reorder"
+      >
+        ⋮⋮
+      </span>
+      <span className="text-sm">{ex.muscle_group_icon}</span>
+      <span className="flex-1 text-sm text-foreground truncate">{ex.exercise_name}</span>
+      <div className="flex items-center gap-1">
+        <input
+          type="number"
+          value={ex.target_sets}
+          onChange={(e) => onUpdate("target_sets", parseInt(e.target.value) || 0)}
+          className="w-12 px-1 py-1 text-center text-xs bg-card border border-border rounded-lg text-foreground"
+          min={1}
+        />
+        <span className="text-xs text-subtext">×</span>
+        <input
+          type="number"
+          value={ex.target_reps}
+          onChange={(e) => onUpdate("target_reps", parseInt(e.target.value) || 0)}
+          className="w-12 px-1 py-1 text-center text-xs bg-card border border-border rounded-lg text-foreground"
+          min={1}
+        />
+      </div>
+      <button onClick={onRemove} className="text-error text-xs px-1">✕</button>
+    </Reorder.Item>
+  );
+}
 
 export default function EditProgramPage() {
   const params = useParams();
@@ -157,6 +206,10 @@ export default function EditProgramPage() {
     );
   };
 
+  const reorderExercises = (workoutId: string, newOrder: WorkoutExerciseDraft[]) => {
+    setWorkouts((prev) => prev.map((w) => (w.id === workoutId ? { ...w, exercises: newOrder } : w)));
+  };
+
   const updateExercise = (workoutId: string, exerciseEntryId: string, field: "target_sets" | "target_reps", value: number) => {
     setWorkouts((prev) =>
       prev.map((w) =>
@@ -292,32 +345,21 @@ export default function EditProgramPage() {
                 <button onClick={() => removeWorkout(workout.id)} className="text-error text-xs px-2 py-1">✕</button>
               </div>
 
-              <div className="space-y-2 mb-3">
+              <Reorder.Group
+                axis="y"
+                values={workout.exercises}
+                onReorder={(newOrder) => reorderExercises(workout.id, newOrder)}
+                className="space-y-2 mb-3"
+              >
                 {workout.exercises.map((ex) => (
-                  <div key={ex.id} className="flex items-center gap-2 p-2 rounded-xl bg-surface">
-                    <span className="text-sm">{ex.muscle_group_icon}</span>
-                    <span className="flex-1 text-sm text-foreground truncate">{ex.exercise_name}</span>
-                    <div className="flex items-center gap-1">
-                      <input
-                        type="number"
-                        value={ex.target_sets}
-                        onChange={(e) => updateExercise(workout.id, ex.id, "target_sets", parseInt(e.target.value) || 0)}
-                        className="w-12 px-1 py-1 text-center text-xs bg-card border border-border rounded-lg text-foreground"
-                        min={1}
-                      />
-                      <span className="text-xs text-subtext">×</span>
-                      <input
-                        type="number"
-                        value={ex.target_reps}
-                        onChange={(e) => updateExercise(workout.id, ex.id, "target_reps", parseInt(e.target.value) || 0)}
-                        className="w-12 px-1 py-1 text-center text-xs bg-card border border-border rounded-lg text-foreground"
-                        min={1}
-                      />
-                    </div>
-                    <button onClick={() => removeExercise(workout.id, ex.id)} className="text-error text-xs px-1">✕</button>
-                  </div>
+                  <ExerciseRow
+                    key={ex.id}
+                    ex={ex}
+                    onUpdate={(field, value) => updateExercise(workout.id, ex.id, field, value)}
+                    onRemove={() => removeExercise(workout.id, ex.id)}
+                  />
                 ))}
-              </div>
+              </Reorder.Group>
 
               <Button size="sm" variant="ghost" onClick={() => openExercisePicker(workout.id)} className="w-full">
                 + Add Exercise
