@@ -70,3 +70,21 @@ export function calculateVolume(sets: { reps_completed: number; weight_used: num
     return total + set.reps_completed * (set.weight_used || 0);
   }, 0);
 }
+
+/**
+ * Returns a short relative-time label for an epoch-ms timestamp.
+ * "just now" | "Xs ago" | "Xm ago" | "Xh ago" | "Xd ago"
+ */
+export function formatRelativeTime(epochMs: number): string {
+  const diffMs = Date.now() - epochMs;
+  if (diffMs < 0) return "just now";
+  const s = Math.floor(diffMs / 1000);
+  if (s < 10) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
