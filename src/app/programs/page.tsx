@@ -1,25 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useCachedQuery } from "@/hooks/useCachedQuery";
+import { invalidateCache } from "@/lib/query-cache";
 import type { Program } from "@/types";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
+interface ProgramsListData {
+  userId: string | null;
+  publicPrograms: Program[];
+  myPrograms: Program[];
+}
+
 export default function ProgramsPage() {
   const [tab, setTab] = useState<"browse" | "mine">("browse");
-  const [publicPrograms, setPublicPrograms] = useState<Program[]>([]);
-  const [myPrograms, setMyPrograms] = useState<Program[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
+  const { data, loading, refetch } = useCachedQuery<ProgramsListData>(
+    "programs:list",
+    async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      setUserId(user?.id || null);
 
       const [{ data: pub }, { data: mine }] = await Promise.all([
         supabase
@@ -36,12 +40,17 @@ export default function ProgramsPage() {
           : Promise.resolve({ data: [] }),
       ]);
 
-      setPublicPrograms(pub || []);
-      setMyPrograms(mine || []);
-      setLoading(false);
-    }
-    load();
-  }, []);
+      return {
+        userId: user?.id || null,
+        publicPrograms: (pub as Program[]) || [],
+        myPrograms: (mine as Program[]) || [],
+      };
+    },
+  );
+
+  const userId = data?.userId ?? null;
+  const publicPrograms = data?.publicPrograms ?? [];
+  const myPrograms = data?.myPrograms ?? [];
 
   const handleClone = async (program: Program) => {
     if (!userId) return;
@@ -95,20 +104,16 @@ export default function ProgramsPage() {
       }
     }
 
-    // Refresh my programs
-    const { data: refreshed } = await supabase
-      .from("programs")
-      .select("*, program_workouts(id, name, day_order)")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false });
-    setMyPrograms(refreshed || []);
+    invalidateCache("programs:");
+    await refetch();
     setTab("mine");
   };
 
   const handleDelete = async (programId: string) => {
     const supabase = createClient();
     await supabase.from("programs").delete().eq("id", programId);
-    setMyPrograms((prev) => prev.filter((p) => p.id !== programId));
+    invalidateCache("programs:");
+    await refetch();
   };
 
   if (loading) {

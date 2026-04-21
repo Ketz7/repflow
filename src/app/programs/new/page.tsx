@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Exercise, MuscleGroup } from "@/types";
 import type { WorkoutDraft, WorkoutExerciseDraft } from "@/types/programs";
 import { newProgramKey } from "@/lib/program-drafts";
+import { invalidateCache } from "@/lib/query-cache";
 import { useProgramDraft } from "@/hooks/useProgramDraft";
 import DraftBanner from "@/components/programs/DraftBanner";
 import DraftSavedIndicator from "@/components/programs/DraftSavedIndicator";
@@ -239,6 +240,7 @@ export default function NewProgramPage() {
     // Only clear the draft on a fully successful save. On partial failure
     // the user can retry without losing their in-progress work.
     if (allSucceeded) clearDraft();
+    invalidateCache("programs:");
     router.push("/programs");
   };
 

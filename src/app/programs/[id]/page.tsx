@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useCachedQuery } from "@/hooks/useCachedQuery";
 import type { Program, ProgramWorkout, WorkoutExercise } from "@/types";
 import Badge from "@/components/ui/Badge";
 import YouTubeEmbed from "@/components/exercises/YouTubeEmbed";
@@ -10,35 +11,58 @@ import Link from "next/link";
 import Button from "@/components/ui/Button";
 import { motion } from "framer-motion";
 
+type DetailWorkout = ProgramWorkout & {
+  workout_exercises: (WorkoutExercise & {
+    exercise: {
+      name: string;
+      muscle_group: { name: string; icon: string };
+      youtube_url: string | null;
+    };
+  })[];
+};
+
+interface ProgramDetailData {
+  program: Program | null;
+  workouts: DetailWorkout[];
+}
+
 export default function ProgramDetailPage() {
   const params = useParams();
-  const [program, setProgram] = useState<Program | null>(null);
-  const [workouts, setWorkouts] = useState<(ProgramWorkout & { workout_exercises: (WorkoutExercise & { exercise: { name: string; muscle_group: { name: string; icon: string }; youtube_url: string | null } })[] })[]>([]);
+  const programId = params.id as string;
   const [expandedWorkout, setExpandedWorkout] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
+  const { data, loading } = useCachedQuery<ProgramDetailData>(
+    `programs:detail:${programId}`,
+    async () => {
       const supabase = createClient();
       const { data: prog } = await supabase
         .from("programs")
         .select("*")
-        .eq("id", params.id)
+        .eq("id", programId)
         .single();
 
       const { data: wkts } = await supabase
         .from("program_workouts")
         .select("*, workout_exercises(*, exercise:exercises(name, youtube_url, muscle_group:muscle_groups(name, icon)))")
-        .eq("program_id", params.id)
+        .eq("program_id", programId)
         .order("day_order");
 
-      setProgram(prog);
-      setWorkouts(wkts || []);
-      if (wkts && wkts.length > 0) setExpandedWorkout(wkts[0].id);
-      setLoading(false);
+      return {
+        program: (prog as Program) ?? null,
+        workouts: (wkts as DetailWorkout[]) || [],
+      };
+    },
+  );
+
+  const program = data?.program ?? null;
+  const workouts = data?.workouts ?? [];
+
+  // Auto-expand the first workout when data first arrives.
+  useEffect(() => {
+    if (expandedWorkout === null && workouts.length > 0) {
+      setExpandedWorkout(workouts[0].id);
     }
-    load();
-  }, [params.id]);
+  }, [workouts, expandedWorkout]);
 
   if (loading) {
     return (
