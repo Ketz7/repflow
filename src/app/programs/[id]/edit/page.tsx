@@ -1,28 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Exercise, MuscleGroup } from "@/types";
+import type { WorkoutDraft } from "@/types/programs";
+import { editProgramKey } from "@/lib/program-drafts";
+import { useProgramDraft } from "@/hooks/useProgramDraft";
+import DraftBanner from "@/components/programs/DraftBanner";
+import DraftSavedIndicator from "@/components/programs/DraftSavedIndicator";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import { motion, AnimatePresence } from "framer-motion";
-
-interface WorkoutDraft {
-  id: string;
-  dbId?: string;
-  name: string;
-  exercises: {
-    id: string;
-    dbId?: string;
-    exercise_id: string;
-    exercise_name: string;
-    muscle_group_icon: string;
-    target_sets: number;
-    target_reps: number;
-  }[];
-}
 
 export default function EditProgramPage() {
   const params = useParams();
@@ -39,6 +29,30 @@ export default function EditProgramPage() {
   const [muscleGroups, setMuscleGroups] = useState<MuscleGroup[]>([]);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseFilter, setExerciseFilter] = useState<string | null>(null);
+
+  const programId = params.id as string;
+  const draftKey = useMemo(() => editProgramKey(programId), [programId]);
+  const {
+    pendingDraft,
+    dismissBanner,
+    discardDraft,
+    clearDraft,
+    savedIndicatorVisible,
+  } = useProgramDraft({
+    key: draftKey,
+    name,
+    description,
+    workouts,
+    enabled: !loading,
+  });
+
+  const handleResume = () => {
+    if (!pendingDraft) return;
+    setName(pendingDraft.name);
+    setDescription(pendingDraft.description);
+    setWorkouts(pendingDraft.workouts);
+    dismissBanner();
+  };
 
   useEffect(() => {
     async function load() {
@@ -192,6 +206,7 @@ export default function EditProgramPage() {
       }
     }
 
+    clearDraft();
     router.push(`/programs/${params.id}`);
   };
 
@@ -215,6 +230,16 @@ export default function EditProgramPage() {
   return (
     <div className="px-4 pt-6 pb-4">
       <h1 className="text-2xl font-bold text-foreground mb-6">Edit Program</h1>
+
+      <AnimatePresence>
+        {pendingDraft && (
+          <DraftBanner
+            savedAt={pendingDraft.savedAt}
+            onResume={handleResume}
+            onDiscard={discardDraft}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="space-y-4 mb-6">
         <div>
@@ -293,9 +318,12 @@ export default function EditProgramPage() {
         </AnimatePresence>
       </div>
 
-      <Button size="lg" className="w-full" disabled={!name.trim() || saving} onClick={handleSave}>
-        {saving ? "Saving..." : "Save Changes"}
-      </Button>
+      <div className="flex items-center justify-end gap-3">
+        <DraftSavedIndicator visible={savedIndicatorVisible} />
+        <Button size="lg" className="flex-1" disabled={!name.trim() || saving} onClick={handleSave}>
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
 
       <Modal isOpen={showExercisePicker} onClose={() => setShowExercisePicker(false)} title="Add Exercise">
         <Input placeholder="Search exercises..." value={exerciseSearch} onChange={(e) => setExerciseSearch(e.target.value)} className="mb-3" />
