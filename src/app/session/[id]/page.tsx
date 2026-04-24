@@ -25,7 +25,6 @@ import {
   loadDraft,
   saveDraft,
   clearDraft,
-  mergeDraftSets,
   purgeStaleDrafts,
 } from "@/lib/session-draft";
 
@@ -35,6 +34,59 @@ interface SetEntry {
   weight_used: number | null;
   completed: boolean;
   rpe: number | null;
+}
+
+/**
+ * Write a completed set to Supabase immediately. Server becomes the source
+ * of truth for logged work — a hard kill can never lose a set the user has
+ * marked done. Delete-then-insert because the table has no unique constraint
+ * on (session_id, exercise_id, set_number); we can migrate to a real upsert
+ * later without changing callers.
+ */
+async function persistCompletedSet(
+  sessionId: string,
+  exerciseId: string,
+  set: SetEntry,
+): Promise<void> {
+  try {
+    const supabase = createClient();
+    await supabase
+      .from("session_sets")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("exercise_id", exerciseId)
+      .eq("set_number", set.set_number);
+    await supabase.from("session_sets").insert({
+      session_id: sessionId,
+      exercise_id: exerciseId,
+      set_number: set.set_number,
+      reps_completed: set.reps_completed,
+      weight_used: set.weight_used,
+      rpe: set.rpe,
+    });
+  } catch (err) {
+    // Offline or transient network — localStorage draft is the fallback,
+    // and handleEndSession's offline queue catches anything still unsaved.
+    console.warn("[session] live set persist failed:", err);
+  }
+}
+
+async function deleteCompletedSet(
+  sessionId: string,
+  exerciseId: string,
+  setNumber: number,
+): Promise<void> {
+  try {
+    const supabase = createClient();
+    await supabase
+      .from("session_sets")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("exercise_id", exerciseId)
+      .eq("set_number", setNumber);
+  } catch (err) {
+    console.warn("[session] live set delete failed:", err);
+  }
 }
 
 interface ExerciseState {
@@ -127,10 +179,83 @@ export default function SessionPage() {
           })),
         }));
 
-        // Restore any in-progress draft (survives tab eviction, backgrounding,
-        // and route remounts). Draft is the user's work — it wins the merge.
+        // ── Server-truth restore ─────────────────────────────────────────
+        // Every set that was marked complete during this session has
+        // already been written to session_sets (live-persist on toggle).
+        // Re-hydrate those back into the UI so backgrounding / app-kill /
+        // reload never shows empty inputs for work the user committed.
+        const { data: committedRows } = await supabase
+          .from("session_sets")
+          .select("exercise_id, set_number, reps_completed, weight_used, rpe")
+          .eq("session_id", params.id as string);
+
+        type Committed = {
+          exercise_id: string;
+          set_number: number;
+          reps_completed: number;
+          weight_used: number | null;
+          rpe: number | null;
+        };
+        const committedByKey = new Map<string, Committed>();
+        for (const row of (committedRows as Committed[] | null) ?? []) {
+          committedByKey.set(`${row.exercise_id}|${row.set_number}`, row);
+        }
+
+        const withServer: ExerciseState[] = fromTemplate.map((ex) => {
+          // Ensure we have placeholders for any set_numbers that exist on
+          // the server but not in the template (user may have added sets
+          // via "+ Add Set" before killing). Seed them lazily.
+          const serverSetNumbers = (committedRows as Committed[] | null ?? [])
+            .filter((r) => r.exercise_id === ex.exercise_id)
+            .map((r) => r.set_number);
+          const maxServerNumber = serverSetNumbers.length > 0 ? Math.max(...serverSetNumbers) : 0;
+          const sets = ex.sets.slice();
+          while (sets.length < maxServerNumber) {
+            sets.push({
+              set_number: sets.length + 1,
+              reps_completed: ex.target_reps,
+              weight_used: null,
+              completed: false,
+              rpe: null,
+            });
+          }
+          return {
+            ...ex,
+            sets: sets.map((s) => {
+              const row = committedByKey.get(`${ex.exercise_id}|${s.set_number}`);
+              if (!row) return s;
+              return {
+                ...s,
+                reps_completed: row.reps_completed,
+                weight_used: row.weight_used,
+                rpe: row.rpe,
+                completed: true,
+              };
+            }),
+          };
+        });
+
+        // localStorage draft is the secondary layer — picks up values the
+        // user typed but hadn't yet marked complete. Only overrides sets
+        // that are NOT already committed on the server.
         const draft = loadDraft(params.id as string);
-        const merged = draft ? mergeDraftSets(fromTemplate, draft) : fromTemplate;
+        let merged = withServer;
+        if (draft) {
+          merged = withServer.map((ex) => {
+            const draftEx = draft.exercises.find((d) => d.exercise_id === ex.exercise_id);
+            if (!draftEx) return ex;
+            return {
+              ...ex,
+              sets: ex.sets.map((s) => {
+                // Server wins for committed sets
+                if (s.completed) return s;
+                const draftSet = draftEx.sets.find((d) => d.set_number === s.set_number);
+                return draftSet ? { ...s, ...draftSet, completed: false } : s;
+              }),
+            };
+          });
+        }
+
         setExercises(merged);
         if (draft) {
           setCurrentIndex(Math.min(draft.currentIndex, merged.length - 1));
@@ -306,10 +431,19 @@ export default function SessionPage() {
   }, []);
 
   const updateSet = (exerciseIdx: number, setIdx: number, field: keyof SetEntry, value: number | boolean | null) => {
+    // Compute the updated set synchronously from current state so we can both
+    // (a) dispatch the pure React state update and (b) fire server persistence
+    // with the correct post-edit shape without racing the render.
+    const exBefore = exercises[exerciseIdx];
+    const setBefore = exBefore?.sets[setIdx];
+    if (!exBefore || !setBefore) return;
+    const nextSet: SetEntry = { ...setBefore, [field]: value };
+
     // Trigger rest timer only when marking a set as done (false → true)
     if (field === "completed" && value === true) {
       setRestTimer({ active: true, seconds: 120 });
     }
+
     setExercises((prev) =>
       prev.map((ex, ei) =>
         ei === exerciseIdx
@@ -322,6 +456,21 @@ export default function SessionPage() {
           : ex
       )
     );
+
+    // ── Server-side durability ────────────────────────────────────────
+    // The moment a set is committed (or edited while committed), write it
+    // to the server. That way a hard app-kill (swipe-up on Android) can
+    // never lose logged work — localStorage buffering can drop writes
+    // under SIGKILL, the server cannot. Fire-and-forget; offline failures
+    // are caught by the IDB offline queue at session end.
+    if (typeof navigator !== "undefined" && navigator.onLine) {
+      const sessionId = params.id as string;
+      if (nextSet.completed) {
+        void persistCompletedSet(sessionId, exBefore.exercise_id, nextSet);
+      } else if (field === "completed" && value === false) {
+        void deleteCompletedSet(sessionId, exBefore.exercise_id, nextSet.set_number);
+      }
+    }
   };
 
   const addSet = (exerciseIdx: number) => {
@@ -449,11 +598,26 @@ export default function SessionPage() {
       // Even on failure, clear the UI so the user isn't stuck
     }
 
-    // Best-effort sets insert — errors are logged but don't block completion
+    // Sets are already persisted live (persistCompletedSet on every
+    // toggle/edit while online). Reconcile any stragglers that slipped
+    // through a transient offline blip: check what's already on the server,
+    // insert only the missing ones. Avoids duplicates by set_number.
     if (allSets.length > 0) {
-      const { error: setsError } = await supabase.from("session_sets").insert(allSets);
-      if (setsError) {
-        console.error("[session] sets insert failed (data may be partial):", setsError.message);
+      const { data: existing } = await supabase
+        .from("session_sets")
+        .select("exercise_id, set_number")
+        .eq("session_id", sessionId);
+      const existingKeys = new Set(
+        (existing ?? []).map((r) => `${r.exercise_id}|${r.set_number}`),
+      );
+      const missing = allSets.filter(
+        (s) => !existingKeys.has(`${s.exercise_id}|${s.set_number}`),
+      );
+      if (missing.length > 0) {
+        const { error: setsError } = await supabase.from("session_sets").insert(missing);
+        if (setsError) {
+          console.error("[session] reconcile insert failed:", setsError.message);
+        }
       }
     }
 
@@ -844,7 +1008,7 @@ export default function SessionPage() {
 
       {/* End Session Confirmation */}
       {showEndConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end">
+        <div className="fixed inset-x-0 top-0 h-dvh bg-black/60 backdrop-blur-sm z-50 flex items-end">
           <motion.div
             initial={{ y: 100 }}
             animate={{ y: 0 }}
@@ -928,12 +1092,15 @@ export default function SessionPage() {
 
       {/* Exercise Swap Modal */}
       {showSwapModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end">
+        // `h-dvh` tracks the dynamic viewport (shrinks when the soft keyboard
+        // opens) so the bottom of the sheet sits above the keyboard instead
+        // of behind it. `max-h-[80dvh]` similarly caps to the live viewport.
+        <div className="fixed inset-x-0 top-0 h-dvh bg-black/60 backdrop-blur-sm z-50 flex items-end">
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="w-full max-h-[80vh] bg-surface/90 backdrop-blur-xl border-t border-white/10 rounded-t-3xl flex flex-col"
+            className="w-full max-h-[80dvh] bg-surface/90 backdrop-blur-xl border-t border-white/10 rounded-t-3xl flex flex-col"
           >
             <div className="p-4 border-b border-border flex items-center justify-between">
               <h3 className="text-lg font-semibold text-foreground">Swap Exercise</h3>
