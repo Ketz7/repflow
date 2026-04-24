@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { WorkoutExercise, Exercise } from "@/types";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
-import YouTubeEmbed from "@/components/exercises/YouTubeEmbed";
+import CollapsibleVideo from "@/components/exercises/CollapsibleVideo";
 import SessionStats from "@/components/workout/SessionStats";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatDuration } from "@/lib/utils";
@@ -836,10 +836,16 @@ export default function SessionPage() {
             transition={{ duration: 0.2 }}
             className="h-full flex flex-col min-h-0"
           >
-            {/* Video */}
+            {/* Video — collapsible pill; defaults open for a fresh exercise,
+                 collapsed once any set is logged. Keyed on currentIndex so it
+                 remounts per exercise, which re-evaluates defaultOpen. */}
             {current.exercise.youtube_url && (
               <div className="mb-3 shrink-0">
-                <YouTubeEmbed url={current.exercise.youtube_url} />
+                <CollapsibleVideo
+                  key={currentIndex}
+                  url={current.exercise.youtube_url}
+                  defaultOpen={!current.sets.some((s) => s.completed)}
+                />
               </div>
             )}
 
