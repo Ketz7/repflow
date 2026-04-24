@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
+import { clearDraft } from "@/lib/session-draft";
 
 interface InProgressSession {
   id: string;
@@ -49,10 +50,13 @@ function StartSessionInner() {
         const sessionAge = Date.now() - new Date(open.started_at).getTime();
 
         if (sessionAge > ABANDON_THRESHOLD_MS) {
-          await supabase
-            .from("workout_sessions")
-            .update({ ended_at: new Date().toISOString() })
-            .eq("id", open.id);
+          // Abandoned >4h ago: DELETE the row rather than setting ended_at.
+          // Every "completed workout" query in the app filters by
+          // `ended_at IS NOT NULL`, so marking ended_at would inflate
+          // session counts, calendar completion, and progress stats with
+          // workouts the user never actually did. session_sets cascade.
+          await supabase.from("workout_sessions").delete().eq("id", open.id);
+          clearDraft(open.id);
           // fall through to create fresh session
         } else if (open.program_workout_id === workoutId) {
           router.replace(`/session/${open.id}`);
@@ -109,11 +113,13 @@ function StartSessionInner() {
     setCancelling(true);
     const supabase = createClient();
 
-    // End the stale session
-    await supabase
-      .from("workout_sessions")
-      .update({ ended_at: new Date().toISOString() })
-      .eq("id", inProgress.id);
+    // "Cancel" must truly cancel — DELETE the row (and its cascade of
+    // session_sets), don't set ended_at. Every completion-oriented query
+    // treats `ended_at IS NOT NULL` as "done", so marking it here would
+    // make cancelled workouts pollute session counts, streaks, volume
+    // stats, and the calendar. Also drop the local draft for this id.
+    await supabase.from("workout_sessions").delete().eq("id", inProgress.id);
+    clearDraft(inProgress.id);
 
     // Create the new session directly — do NOT rely on router.replace(same URL)
     // to re-trigger the effect, as Next.js App Router treats same-URL replaces
@@ -156,14 +162,21 @@ function StartSessionInner() {
     }
   };
 
+  // Compute "started Xm ago" once when the prompt appears. Wall-clock reads
+  // during render violate React Compiler purity; pinning at discovery time
+  // is also more honest — the prompt shouldn't tick as the user reads it.
+  const startedAtMs = inProgress ? new Date(inProgress.started_at).getTime() : 0;
+  const timeAgo = useMemo(() => {
+    if (!inProgress) return "";
+    const mins = Math.round((Date.now() - startedAtMs) / 60000);
+    return mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
+    // Intentionally keyed only on session id: we want a single snapshot per
+    // discovered unfinished session, not a ticking clock.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inProgress?.id]);
+
   // Show resume/cancel prompt
   if (inProgress) {
-    const startedMins = Math.round(
-      (Date.now() - new Date(inProgress.started_at).getTime()) / 60000
-    );
-    const timeAgo = startedMins < 60
-      ? `${startedMins}m ago`
-      : `${Math.round(startedMins / 60)}h ago`;
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-background px-6">
