@@ -21,6 +21,13 @@ import {
 } from "@/lib/training-analytics";
 import AutoregHint from "@/components/session/AutoregHint";
 import PRCelebrationModal from "@/components/session/PRCelebrationModal";
+import {
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  mergeDraftSets,
+  purgeStaleDrafts,
+} from "@/lib/session-draft";
 
 interface SetEntry {
   set_number: number;
@@ -105,22 +112,30 @@ export default function SessionPage() {
         .order("sort_order");
 
       if (workoutExercises) {
-        setExercises(
-          workoutExercises.map((we: WorkoutExercise & { exercise: Exercise & { muscle_group?: { name: string; icon: string } }; alternatives?: string[] }) => ({
-            exercise_id: we.exercise_id,
-            exercise: we.exercise,
-            target_sets: we.target_sets,
-            target_reps: we.target_reps,
-            alternatives: we.alternatives || [],
-            sets: Array.from({ length: we.target_sets }, (_, i) => ({
-              set_number: i + 1,
-              reps_completed: we.target_reps,
-              weight_used: null,
-              completed: false,
-              rpe: null,
-            })),
-          }))
-        );
+        const fromTemplate: ExerciseState[] = workoutExercises.map((we: WorkoutExercise & { exercise: Exercise & { muscle_group?: { name: string; icon: string } }; alternatives?: string[] }) => ({
+          exercise_id: we.exercise_id,
+          exercise: we.exercise,
+          target_sets: we.target_sets,
+          target_reps: we.target_reps,
+          alternatives: we.alternatives || [],
+          sets: Array.from({ length: we.target_sets }, (_, i) => ({
+            set_number: i + 1,
+            reps_completed: we.target_reps,
+            weight_used: null,
+            completed: false,
+            rpe: null,
+          })),
+        }));
+
+        // Restore any in-progress draft (survives tab eviction, backgrounding,
+        // and route remounts). Draft is the user's work — it wins the merge.
+        const draft = loadDraft(params.id as string);
+        const merged = draft ? mergeDraftSets(fromTemplate, draft) : fromTemplate;
+        setExercises(merged);
+        if (draft) {
+          setCurrentIndex(Math.min(draft.currentIndex, merged.length - 1));
+          setRestTimer(draft.restTimer);
+        }
 
         // Fetch 90-day history for these exercises so we can show autoreg hints.
         // Batched into a single query — per-exercise computation happens client-side.
@@ -242,6 +257,54 @@ export default function SessionPage() {
     return () => { if (restTimerRef.current) clearInterval(restTimerRef.current); };
   }, [restTimer.active]);
 
+  // ── Draft persistence ───────────────────────────────────────────────────
+  // Save after every meaningful state change. localStorage writes are
+  // synchronous and take microseconds for the <5KB payload — no debounce
+  // needed, and no debounce means no race with `pagehide`.
+  useEffect(() => {
+    if (loading || exercises.length === 0) return;
+    saveDraft(params.id as string, {
+      currentIndex,
+      restTimer,
+      exercises: exercises.map((ex) => ({
+        exercise_id: ex.exercise_id,
+        sets: ex.sets,
+      })),
+    });
+  }, [exercises, currentIndex, restTimer, loading, params.id]);
+
+  // Flush synchronously when the tab is hidden or the page is being put
+  // into bfcache / terminated. `pagehide` is the reliable mobile signal;
+  // `visibilitychange` covers the tab-switch / home-screen case on desktop
+  // and some Android builds. Both call the same cheap localStorage write.
+  useEffect(() => {
+    if (loading || exercises.length === 0) return;
+    const flush = () => {
+      saveDraft(params.id as string, {
+        currentIndex,
+        restTimer,
+        exercises: exercises.map((ex) => ({
+          exercise_id: ex.exercise_id,
+          sets: ex.sets,
+        })),
+      });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [exercises, currentIndex, restTimer, loading, params.id]);
+
+  // Garbage-collect drafts from long-abandoned sessions once per mount.
+  useEffect(() => {
+    purgeStaleDrafts();
+  }, []);
+
   const updateSet = (exerciseIdx: number, setIdx: number, field: keyof SetEntry, value: number | boolean | null) => {
     // Trigger rest timer only when marking a set as done (false → true)
     if (field === "completed" && value === true) {
@@ -354,6 +417,8 @@ export default function SessionPage() {
     if (!navigator.onLine) {
       // Save to IndexedDB and show offline confirmation
       await enqueueOfflineSession({ sessionId, endedAt: endTime, sets: allSets });
+      // Draft's job is done — IDB queue now owns this data until it syncs.
+      clearDraft(sessionId);
       // Register background sync so the SW can retry when the device wakes
       if ("serviceWorker" in navigator && "SyncManager" in window) {
         const reg = await navigator.serviceWorker.ready;
@@ -391,6 +456,9 @@ export default function SessionPage() {
         console.error("[session] sets insert failed (data may be partial):", setsError.message);
       }
     }
+
+    // Session is committed server-side — the local draft is redundant now.
+    clearDraft(sessionId);
 
     if (timerRef.current) clearInterval(timerRef.current);
 
